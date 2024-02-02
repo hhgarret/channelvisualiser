@@ -12,22 +12,25 @@ decimationcount = 0
 count = 0
 totallength = int(48000 / (2*decimationfactor))
 appendlength = int(4800 / (decimationfactor))
-charts = []
-tempcharts = []
+numchannels = 24
+charts = np.zeros((24, totallength))
+tempcharts = np.zeros((24, appendlength))
 
 framecount = 0;
 frameratio = appendlength * decimationfactor / 1000
 
 
-for i in range(24):
-    charts.append([0] * totallength)
-for i in range(24):
-    tempcharts.append([])
+#for i in range(numchannels):
+#    charts.append([0] * totallength)
+#for i in range(numchannels):
+#    tempcharts.append([])
 
 disabledaxes = []
 disabledcount = 0
-widthratios = [1, 1, 1, 1] #for columns 0-3
-heightratios = [1, 1, 1, 1, 1, 1] # for rows 0-5
+width = 4
+height = 6
+widthratios = [1]*width #for columns 0-3
+heightratios = [1]*height # for rows 0-5
 def on_click(event):
 	global old_fig_size, window, fig, plt, disabledaxes, disabledcount, axes, gs, heightratios, widthratios
 	#event.inaxes.set_axis_off()
@@ -39,17 +42,17 @@ def on_click(event):
 		#event.inaxes.set_xlim((0, 0.01))
 		#event.inaxes.set_ylim((0, 0.01))
 		#check columns
-		for i in range(4):
+		for i in range(width):
 			col = False #presume that all are gone
-			for j in range(6):
-				if axes.flat[i + 4*j] not in disabledaxes: #if any are present
+			for j in range(height):
+				if axes.flat[i + width*j] not in disabledaxes: #if any are present
 					col = True
 			if col is False:
 				widthratios[i] = .001
-		for j in range(6):
+		for j in range(height):
 			row = False
-			for i in range(4):
-				if axes.flat[4*j + i] not in disabledaxes:
+			for i in range(width):
+				if axes.flat[width*j + i] not in disabledaxes:
 					row = True
 			if row is False:
 				heightratios[j] = .001
@@ -61,7 +64,7 @@ def on_click(event):
 		#plt.tight_layout()
 		gs.update()
 		gs.tight_layout(fig)
-		for i in range(24):
+		for i in range(numchannels):
 			axes.flat[i].set_position(gs[i].get_position(fig))
 		
 	old_fig_size = old_fig_size - [1,1]
@@ -70,11 +73,11 @@ def on_click(event):
 
 plots = []
 xvals = range(totallength)
-fig, axes = plt.subplots(nrows=6, ncols=4, squeeze=True, gridspec_kw={'width_ratios':widthratios, 'height_ratios':heightratios})
+fig, axes = plt.subplots(nrows=height, ncols=width, squeeze=True, gridspec_kw={'width_ratios':widthratios, 'height_ratios':heightratios})
 gs = axes[0,0].get_gridspec()
 ylim = .05
 plt.connect('button_press_event', on_click)
-for i in range(24):
+for i in range(numchannels):
     pltline, = axes.flat[i].plot(charts[i], marker='.', ms='.1', ls='', alpha=1, animated=True, zorder=10)
     plots.append(pltline)
     axes.flat[i].set_xlim(0, totallength)
@@ -86,7 +89,7 @@ for i in range(24):
 #plt.tight_layout()
 gs.tight_layout(fig)
 
-for i in range(24):
+for i in range(numchannels):
 	axes.flat[i].set_position(gs[i].get_position(fig))
 
 window = Tk()
@@ -105,14 +108,14 @@ def updateheight(add_or_remove):
         ylim *= 1/1.5
         yText.delete("1.0", "1.30")
         yText.insert(INSERT, "Height: +/-"+str(ylim))
-    for i in range(24):
+    for i in range(numchannels):
         axes.flat[i].set_ylim(-1*ylim, ylim)
     # bg = fig.canvas.copy_from_bbox(fig.bbox)
 def updatewidth(add_or_remove):
-    global axes, totallength, plt, xvals
+    global axes, totallength, plt, xvals, width, height
     if add_or_remove == "add":
         totallength += appendlength #increase width by a frame
-        for i in range(24):
+        for i in range(numchannels):
             charts[i] = [0]*appendlength + charts[i]
             axes.flat[i].set_xlim(0, totallength)
         xvals = range(totallength)
@@ -120,8 +123,8 @@ def updatewidth(add_or_remove):
         xText.insert(INSERT, "Width: "+str(totallength)+" samples")
     elif totallength > 2*appendlength:
         totallength -= appendlength
-        for i in range(24):
-            charts[i] = charts[i][appendlength:]
+        charts = charts[:, appendlength:]
+        for i in range(numchannels):
             axes.flat[i].set_xlim(0, totallength)
         xvals = range(totallength)
         xText.delete("1.0", "1.30")
@@ -131,13 +134,13 @@ def resetfig():
 	for disabledax in disabledaxes:
 		disabledax.set_axis_on()
 	disabledaxes = []
-	widthratios = [1,1,1,1]
-	heightratios = [1,1,1,1,1,1]
+	widthratios = [1]*width
+	heightratios = [1]*height
 	gs.set_height_ratios(heightratios)
 	gs.set_width_ratios(widthratios)
 	gs.update()
 	gs.tight_layout(fig)
-	for i in range(24):
+	for i in range(numchannels):
 		axes.flat[i].set_position(gs[i].get_position(fig))
 	old_fig_size = old_fig_size - [1,1]
 	window.update_idletasks()
@@ -184,8 +187,9 @@ for line in sys.stdin:
     else:
         decimationcount = 0
         linesplit = line.split("\t")
-        for i in range(24):
-            tempcharts[i].append(float(linesplit[i]))
+        tempcharts[:, count] = np.asarray(linesplit, dtype=float)
+        #for i in range(numchannels):
+        #   tempcharts[i].append(float(linesplit[i]))
         count += 1
         if (count % appendlength == 0):
             if(old_fig_size != fig.get_size_inches()).any():
@@ -193,9 +197,10 @@ for line in sys.stdin:
                 bg = fig.canvas.copy_from_bbox(fig.bbox)
                 old_fig_size = fig.get_size_inches()
             fig.canvas.restore_region(bg)
-            for i in range(24):
-                charts[i] = charts[i][appendlength:] + tempcharts[i]
-                tempcharts[i] = []
+            charts = np.concatenate((charts[:,appendlength:],tempcharts), axis=1)
+            for i in range(numchannels):
+                #charts[i] = charts[i][appendlength:] + tempcharts[i]
+                #tempcharts[i] = []
                 plots[i].set_data(xvals, charts[i])
                 if axes.flat[i] not in disabledaxes:
                 	axes.flat[i].draw_artist(plots[i])
@@ -215,3 +220,7 @@ window.mainloop()
 
 
 #TODO: Utilize numpy
+#reactor 24 -> numchannels, 6 -> height, 4 -> width, and all channels/tempchannels to use numpy
+#notes, use np.roll(charts, (1 or -1?), axis=1) to roll left to right
+#can get last column using charts[:, -1]
+#
