@@ -112,11 +112,11 @@ def updateheight(add_or_remove):
         axes.flat[i].set_ylim(-1*ylim, ylim)
     # bg = fig.canvas.copy_from_bbox(fig.bbox)
 def updatewidth(add_or_remove):
-    global axes, totallength, plt, xvals, width, height
+    global axes, totallength, plt, xvals, width, height, charts
     if add_or_remove == "add":
         totallength += appendlength #increase width by a frame
+        charts = np.append(np.zeros((24,appendlength)), charts, axis=1)
         for i in range(numchannels):
-            charts[i] = [0]*appendlength + charts[i]
             axes.flat[i].set_xlim(0, totallength)
         xvals = range(totallength)
         xText.delete("1.0", "1.30")
@@ -153,22 +153,27 @@ xFrame = Frame(master = masterFrame)
 xFrame.pack(side = RIGHT)
 increase_y_button = Button(master = yFrame, command = lambda:updateheight("add"), height=2, width=20, text="zoom out height")
 increase_y_button.pack()
+window.bind('<Up>', lambda event:updateheight("add"))
 yText = Text(master = yFrame, height = 1)
 yText.insert(INSERT, "Height: +/-"+str(ylim))
 yText.pack()
 decrease_y_button = Button(master = yFrame, command = lambda:updateheight("remove"), height=2, width=20, text="zoom in height")
 decrease_y_button.pack()
+window.bind('<Down>', lambda event:updateheight("remove"))
 increase_x_button = Button(master = xFrame, command = lambda:updatewidth("add"), height=2, width=20, text="zoom out width")
 increase_x_button.pack()
+window.bind('<Right>', lambda event:updatewidth("add"))
 xText = Text(master = xFrame, height = 1)
 xText.insert(INSERT, "Width: "+str(totallength)+" samples")
 xText.pack()
 decrease_x_button = Button(master = xFrame, command = lambda:updatewidth("remove"), height=2, width=20, text="zoom in width")
 decrease_x_button.pack()
+window.bind('<Left>', lambda event:updatewidth("remove"))
 latencyText = Text(master = masterFrame, height = 1)
 latencyText.pack(side = BOTTOM)
 resetButton = Button(master = masterFrame, height = 1, command = lambda:resetfig(),text="reset fig")
 resetButton.pack(side= BOTTOM)
+window.attributes('-zoomed', True)
 
 
 
