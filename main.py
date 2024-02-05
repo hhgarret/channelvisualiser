@@ -1,6 +1,7 @@
 import socket, time, sys
 import matplotlib.pyplot as plt
 import numpy as np
+import math
 from matplotlib.animation import FuncAnimation
 from tkinter import *
 from matplotlib.backends.backend_tkagg import (FigureCanvasTkAgg, NavigationToolbar2Tk)
@@ -103,11 +104,11 @@ def updateheight(add_or_remove):
     if add_or_remove == "add":
         ylim *= 1.5
         yText.delete("1.0", "1.30")
-        yText.insert(INSERT, "Height: +/-"+str(ylim))
+        yText.insert(INSERT, "Height: +/-"+("%.4f"%ylim))
     else:
         ylim *= 1/1.5
         yText.delete("1.0", "1.30")
-        yText.insert(INSERT, "Height: +/-"+str(ylim))
+        yText.insert(INSERT, "Height: +/-"+("%.4f"%ylim))
     for i in range(numchannels):
         axes.flat[i].set_ylim(-1*ylim, ylim)
     # bg = fig.canvas.copy_from_bbox(fig.bbox)
@@ -120,7 +121,7 @@ def updatewidth(add_or_remove):
             axes.flat[i].set_xlim(0, totallength)
         xvals = range(totallength)
         xText.delete("1.0", "1.30")
-        xText.insert(INSERT, "Width: "+str(totallength)+" samples")
+        xText.insert(INSERT, "Width: "+("%f"%totallength)+" samples")
     elif totallength > 2*appendlength:
         totallength -= appendlength
         charts = charts[:, appendlength:]
@@ -128,7 +129,7 @@ def updatewidth(add_or_remove):
             axes.flat[i].set_xlim(0, totallength)
         xvals = range(totallength)
         xText.delete("1.0", "1.30")
-        xText.insert(INSERT, "Width: "+str(totallength)+" samples")
+        xText.insert(INSERT, "Width: "+("%f"%totallength)+" samples")
 def resetfig():
 	global axes, fig, gs, widthratios, heightratios, disabledaxes, old_fig_size
 	for disabledax in disabledaxes:
@@ -155,7 +156,7 @@ increase_y_button = Button(master = yFrame, command = lambda:updateheight("add")
 increase_y_button.pack()
 window.bind('<Up>', lambda event:updateheight("add"))
 yText = Text(master = yFrame, height = 1)
-yText.insert(INSERT, "Height: +/-"+str(ylim))
+yText.insert(INSERT, "Height: +/-"+("%.4f"%ylim))
 yText.pack()
 decrease_y_button = Button(master = yFrame, command = lambda:updateheight("remove"), height=2, width=20, text="zoom in height")
 decrease_y_button.pack()
@@ -164,7 +165,7 @@ increase_x_button = Button(master = xFrame, command = lambda:updatewidth("add"),
 increase_x_button.pack()
 window.bind('<Right>', lambda event:updatewidth("add"))
 xText = Text(master = xFrame, height = 1)
-xText.insert(INSERT, "Width: "+str(totallength)+" samples")
+xText.insert(INSERT, "Width: "+("%f"%totallength)+" samples")
 xText.pack()
 decrease_x_button = Button(master = xFrame, command = lambda:updatewidth("remove"), height=2, width=20, text="zoom in width")
 decrease_x_button.pack()
@@ -215,7 +216,7 @@ for line in sys.stdin:
             framecount += frameratio
             #print("Time Since Start: %3.2f, Framecount: %5dk, Ideal: %5dk" % (time.time() - starttime, framecount, 48*(time.time()-starttime)))
             latencyText.delete("1.0", "1.50")
-            latencyText.insert(INSERT, "Frame Difference: "+str(48*(time.time()-starttime) - framecount)+"k")
+            latencyText.insert(INSERT, "Frame Difference: "+("%.4f"%(48*(time.time()-starttime) - framecount))+"k")
             
             
             
@@ -223,9 +224,12 @@ for line in sys.stdin:
 print(time.time() - starttime)
 window.mainloop()
 
+def factor_int(n): #sufficiently close integer factors of n
+	a = math.floor(math.sqrt(n))
+	b = math.ceil(n/float(a))
+	return a, b
 
-#TODO: Utilize numpy
-#reactor 24 -> numchannels, 6 -> height, 4 -> width, and all channels/tempchannels to use numpy
-#notes, use np.roll(charts, (1 or -1?), axis=1) to roll left to right
-#can get last column using charts[:, -1]
-#
+
+#TODO: Recognize channel count from first line of input, adapt format to match
+#	i.e., read in number of channels, find x,y which are closest factors
+#TODO: Reset entire fig upon number of channels changed, i.e., redraw with n channels display
