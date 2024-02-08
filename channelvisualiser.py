@@ -120,8 +120,9 @@ fig, axes = plt.subplots(2,2)
 xvals = range(totallength)
 ylim = 0.05
 flushflag = False
+cid1, cid2 = (0, 0)
 def init_fig():
-	global plots, totallength, fig, axes, xvals, ylim, numchannels, disabledindex, numchannels, canvas, window, maxchannels
+	global plots, totallength, fig, axes, xvals, ylim, numchannels, disabledindex, numchannels, canvas, window, maxchannels, cid1,cid2
 	toggleFaucet(False)
 	plots = []
 	xvals = range(totallength)
@@ -129,9 +130,11 @@ def init_fig():
 	#print(f"%d numchannels, %d height, %d width" % (numchannels, height, width))
 	plt.close()
 	fig, axes = plt.subplots(nrows=height, ncols=width, squeeze=True, sharex=True,sharey=True)
+	fig.canvas.draw()
 	ylim = .05
-	plt.connect('button_press_event', on_click)
-	plt.connect('draw_event', on_draw)
+	#cid1=plt.connect('button_press_event', on_click)
+	#cid2=plt.connect('draw_event', on_draw)
+	#print(cid1,cid2)
 	skipped = 0
 	for i in range(maxchannels):
 	    if i in disabledindex:
@@ -149,15 +152,18 @@ def init_fig():
 	    #print("title of axes %d, %d, with skipped=%d" % ((i-skipped), (i+1), skipped))
 	    axes.flat[i-skipped].set_title((i+1), fontsize='small',loc='left')
 	plt.tight_layout()
-	plt.connect('button_press_event', on_click)
+	#plt.connect('button_press_event', on_click)
 	canvas.get_tk_widget().pack_forget()
 	canvas.get_tk_widget().destroy()
 	canvas = FigureCanvasTkAgg(fig, master = window)
+	cid1 = canvas.mpl_connect('button_press_event', on_click)
+	civd2 = canvas.mpl_connect('draw_event', on_draw)
 	canvas.draw()
 	canvas.get_tk_widget().pack(fill='both',expand=True,side='top')
 	diff =  (height*width) - numchannels
 	for i in range(1, diff+1):
 		axes.flat[-1*i].set_axis_off()
+		
 	toggleFaucet(True)
 
 
@@ -220,8 +226,8 @@ def resetfig():
 		disabledax.set_axis_on()
 	disabledaxes = []
 	disabledindex = []
-	for i in range(numchannels):
-		axes.flat[i].set_position(gs[i].get_position(fig))
+	#for i in range(numchannels):
+		#axes.flat[i].set_position(gs[i].get_position(fig))
 	old_fig_size = old_fig_size - [1,1]
 	#window.update_idletasks()
 	fig.canvas.draw_idle()
@@ -261,12 +267,13 @@ init_fig()
 
 # plt.get_current_fig_manager().window.state('zoomed')
 # plt.show(block=False)
-plt.pause(0.0000001)
+#plt.pause(0.0000001)
 plt.close()
 bg = fig.canvas.copy_from_bbox(fig.bbox)
 old_fig_size = fig.get_size_inches()
 fig.canvas.blit(fig.bbox)
 
+#print(cid1, cid2)
 for line in sys.stdin:
     if flushflag:
      #   sys.stdin.flush()
