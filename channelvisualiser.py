@@ -10,6 +10,8 @@ import termios
 import matplotlib.ticker as ticker
 import asyncio
 
+
+#Some initial variable declarations. 
 starttime = time.time();
 decimationfactor = 10
 decimationcount = 0
@@ -20,10 +22,20 @@ maxchannels = 24
 numchannels = 24
 charts = np.zeros((24, totallength))
 tempcharts = np.zeros((24, appendlength))
-
 framecount = 0;
 curchannels = [i for i in range(maxchannels)]
 faucet = True
+disabledaxes = []
+disabledindex = []
+disabledcount = 0
+width = 4
+height = 6
+widthratios = [1]*width #for columns 0-3
+heightratios = [1]*height # for rows 0-5
+
+#The toggleFaucet method exists to interact with the xstream process, namely by turning on or off the flow of data from xstream to stdout/stdin.
+#This is achieved by writing either '0' or '1' to /tmp/xstreamControl, a pipe which is read in by xstream
+#When toggled off, the faucet flag is set to False, which turns off readin(). When turned back on, readin() should be also called.
 def toggleFaucet(onoroff):
 	global flushflag, faucet, fc
 	#print(onoroff)
@@ -53,90 +65,50 @@ def toggleFaucet(onoroff):
 			faucet = True
 			asyncio.run(readin())
 	print(faucet)
-#toggleFaucet(True)
-#for i in range(numchannels):
-#    charts.append([0] * totallength)
-#for i in range(numchannels):
-#    tempcharts.append([])
 
-disabledaxes = []
-disabledindex = []
-disabledcount = 0
-width = 4
-height = 6
-widthratios = [1]*width #for columns 0-3
-heightratios = [1]*height # for rows 0-5
 
+#This method helps map the enabled/disabled axes to the plotaxes. This essentially places a given n in the first available space in arr.
+#If given 1 and [0,1,2,4], it would return 3 (can't place at 1, so check at +1. Can't place at 2, so check at +2. 3 is open, so return 3)
 def considerateaddition(n, arr):
 	saven = n
 	for num in arr:
 		if num <= saven:
 			saven += 1
 	return saven
-def factor_int(n): #sufficiently close integer factors of n
+#Used to get a balanced width/height for any given number of plots.
+#sufficiently close integer factors of n
+def factor_int(n): 
 	a = math.floor(math.sqrt(n))
 	b = math.ceil(n/float(a))
 	return a, b
+#the on_draw method is called whenever the on_draw event is triggered
 def on_draw(event):
 	a = 1
 	#print('hello')
 	#toggleFaucet(True)
+	
+#the on_click method is called whenever the on_click event is triggered
+#Here, it checks to see if a plot was clicked, then determined which plot was clicked, and essentially minimizes that plot.
 def on_click(event):
 	global old_fig_size, window, fig, plt, disabledaxes, disabledcount, axes, numchannels, curchannels
 	#event.inaxes.set_axis_off()
 	if numchannels == 2:
 		return
 	if event.inaxes is not None:
-		#event.inaxes.remove()
 		event.inaxes.set_axis_off()
-		#event.inaxes.set_in_layout(False)
 		disabledaxes.append(event.inaxes)
-		#print(np.where(axes == event.inaxes)[1][0])
-		#if num of axes left <= 3, np.where()[1]
-		#print(np.where(axes.flat == event.inaxes)[0][0])
 		actindex = considerateaddition(np.where(axes.flat == event.inaxes)[0][0], disabledindex)
+		print(actindex)
 		disabledindex.append(actindex)
-		#print(disabledindex)
-		#print(np.where(axes==event.inaxes)[1][0], disabledindex)
-		#event.inaxes.set_xlim((0, 0.01))
-		#event.inaxes.set_ylim((0, 0.01))
-		#check columns
-		#for i in range(width):
-		#	col = False #presume that all are gone
-		#	for j in range(height):
-		#		if axes.flat[i + width*j] not in disabledaxes: #if any are present
-		#			col = True
-		#	if col is False:
-		#		widthratios[i] = .001
-		#for j in range(height):
-		#	row = False
-		#	for i in range(width):
-		#		if axes.flat[width*j + i] not in disabledaxes:
-		#			row = True
-		#	if row is False:
-		#		heightratios[j] = .001
-		#print(heightratios)
-		#print(widthratios)
-		#print(vars(axes.flat[0]))
-		#gs.set_height_ratios(heightratios)
-		#gs.set_width_ratios(widthratios)
-		#plt.tight_layout()
-		#gs.update()
-		#gs.tight_layout(fig)
-		#for i in range(numchannels):
-			#axes.flat[i].set_position(gs[i].get_position(fig))
+		numchannels -= 1
+	
+		old_fig_size = old_fig_size - [1,1]
 		
-	
-	old_fig_size = old_fig_size - [1,1]
-	#window.update_idletasks()
-	#fig.canvas.draw_idle()
-	numchannels -= 1
-	
-	allchannels = {i for i in range(maxchannels)}
-	dischannels = {i for i in disabledindex}
-	curset = allchannels - dischannels
-	curchannels = [elem for elem in curset]
-	init_fig()
+		allchannels = {i for i in range(maxchannels)}
+		dischannels = {i for i in disabledindex}
+		curset = allchannels - dischannels
+		curchannels = [elem for elem in curset]
+		init_fig()
 
 
 plots = []
@@ -145,38 +117,34 @@ fig, axes = plt.subplots(2,2)
 xvals = range(totallength)
 ylim = 0.05
 flushflag = False
+#init_fig initalizes fig and axes for any given enabled channels. Called once at the start, and also whenever a channel is disabled.
 def init_fig():
 	global plots, totallength, fig, axes, xvals, ylim, numchannels, disabledindex, numchannels, canvas, window, maxchannels
-	#toggleFaucet(False)
 	plots = []
 	xvals = range(totallength)
 	width, height = factor_int(numchannels)
-	#print(f"%d numchannels, %d height, %d width" % (numchannels, height, width))
 	plt.close()
 	fig, axes = plt.subplots(nrows=height, ncols=width, squeeze=True, sharex=True,sharey=True)
 	ylim = .05
 	plt.connect('button_press_event', on_click)
 	plt.connect('draw_event', on_draw)
 	skipped = 0
-	
-	#print(len(axes.flat))
 	if maxchannels > 1:
 		for i in range(maxchannels):
 		    if i in disabledindex:
 		    	skipped += 1
 		    	continue
-		    ms = ".{num}".format(num = int(2+(24-maxchannels)/4))
-		    pltline, = axes.flat[i-skipped].plot(charts[i], marker='.', ms=ms, ls='', mfc='midnightblue', alpha=1, animated=True, zorder=10)
+		    ms = "{:.1f}".format((2+(24-numchannels)/2)/10)
+		    pltline, = axes.flat[i-skipped].plot(charts[i], '.k', ms=ms, ls='', alpha=1, animated=True, zorder=10)
 		    plots.append(pltline)
 		    axes.flat[i-skipped].set_xlim(0, totallength)
 		    axes.flat[i-skipped].set_ylim(-1*ylim, ylim)
 		    axes.flat[i-skipped].draw_artist(pltline)
 		    axes.flat[i-skipped].set_yticks([])
-		    #ticks_x = ticker.FuncFormatter(lambda x, pos:'{0:.2f}'.format(x*decimationfactor/48000))
-		    #axes.flat[i-skipped].xaxis.set_major_formatter(ticks_x)
 		    axes.flat[i-skipped].set_xticks([])
-		    #print("title of axes %d, %d, with skipped=%d" % ((i-skipped), (i+1), skipped))
 		    axes.flat[i-skipped].set_title((i+1), fontsize='small',loc='left')
+		
+		print(ms)
 		plt.tight_layout()
 		plt.connect('button_press_event', on_click)
 		canvas.get_tk_widget().pack_forget()
@@ -187,12 +155,7 @@ def init_fig():
 		diff =  (height*width) - numchannels
 		for i in range(1, diff+1):
 			axes.flat[-1*i].set_axis_off()
-		#toggleFaucet(True)
-	
 
-
-#for i in range(numchannels):
-	#axes.flat[i].set_position(gs[i].get_position(fig))
 
 window = Tk()
 window.title("Harley's Data Viewer")
@@ -201,6 +164,7 @@ canvas = FigureCanvasTkAgg(fig, master = window)
 canvas.draw()
 canvas.get_tk_widget().pack(fill='both',expand=True,side='top')
 
+#updateheight increases/decreases the ylim of the graphs
 def updateheight(add_or_remove):
     global axes, ylim, plt, old_fig_size
     #toggleFaucet(False)
@@ -216,11 +180,9 @@ def updateheight(add_or_remove):
         axes.flat[i].set_ylim(-1*ylim, ylim)
     old_fig_size = old_fig_size - [1,1]
     fig.canvas.draw_idle()
-    #toggleFaucet(True)
-    # bg = fig.canvas.copy_from_bbox(fig.bbox)
+#updatewidth increases/decreases the xlim of the graphs & charts, either allowing more or less points/frames to be displayed
 def updatewidth(add_or_remove):
     global axes, totallength, plt, xvals, width, height, charts, old_fig_size, decimationfactor, appendlength, count, decimationcount, tempcharts
-    #toggleFaucet(False)
     if add_or_remove == "add":
         totallength += appendlength #increase width by a frame
         charts = np.append(np.zeros((24,appendlength)), charts, axis=1)
@@ -235,52 +197,35 @@ def updatewidth(add_or_remove):
         xvals = range(totallength)
        
     else: #decrease, but below the current two frames... idea is to decrease df, increase frames
-    	#if decimationfactor == 10: # go to 5, double appendlength
-    	    #decimationfactor = 5
-    	    #appendlength = int(appendlength/2)
-    	    #totallength = int(totallength/2)
-    	#elif decimationfactor == 5: # go to 1, 5x appendlength
-    	 #   decimationfactor = 1
-    	  #  appendlength = int(appendlength/5)
-    	    #totallength = int(totallength/5)
-    	#else:
-    	#    return
     	if appendlength == 480:
     		appendlength = int(appendlength/2)
-    		#totallength = int(totallength/2)
-    	#charts = np.zeros((24, totallength))
+    		decimationfactor = 8
+    	elif appendlength == 240:
+    		appendlength = int(appendlength/2)
+    		decimationfactor = 7
     	tempcharts = np.zeros((24, appendlength))
     	for i in range(numchannels):
     	    axes.flat[i].set_xlim(0, totallength)
     	xvals = range(totallength)
     	count = 0
     	decimationcount = 0
-    	
-    #for i in range(len(axes)):
-        #ticks_x = ticker.FuncFormatter(lambda x, pos:'{0:.2f}'.format(x*decimationfactor/48000))
-        #axes.flat[i].xaxis.set_major_formatter(ticks_x)
     xText.delete("1.0", "1.100")
     xText.insert(INSERT, "Width: "+("%.0f"%(totallength*decimationfactor))+" samples (undecimated), decimation of "+str(decimationfactor))
     old_fig_size = old_fig_size - [1,1]
     fig.canvas.draw_idle()
-    #toggleFaucet(True)
+#resetfig reenables all disabled axes 
 def resetfig():
 	global axes, fig, disabledaxes, old_fig_size, disabledindex, numchannels, maxchannels, curchannels
-	#toggleFaucet(False)
-	#for disabledax in disabledaxes:
-	#	disabledax.set_axis_on()
+	toggleFaucet(False)
 	disabledaxes = []
 	disabledindex = []
 	numchannels = maxchannels
-	#for i in range(numchannels):
-		#axes.flat[i].set_position(gs[i].get_position(fig))
 	curchannels = [elem for elem in range(maxchannels)]
 	print(curchannels, disabledaxes, disabledindex, numchannels)
 	init_fig()
 	old_fig_size = old_fig_size - [1,1]
-	#window.update_idletasks()
-	#fig.canvas.draw_idle()
-	#toggleFaucet(True)
+	toggleFaucet(True)
+#tkinter window/gui creation
 masterFrame = Frame(master = window)
 masterFrame.pack()
 yFrame = Frame(master = masterFrame)
@@ -312,12 +257,9 @@ resetButton.pack(side= BOTTOM)
 pauseButton = Button(master = masterFrame, height = 1, command = lambda:toggleFaucet(""), text="pause fig")
 pauseButton.pack(side=BOTTOM)
 init_fig()
-#window.attributes('-zoomed', True)
+window.attributes('-zoomed', True)
 
 
-
-# plt.get_current_fig_manager().window.state('zoomed')
-# plt.show(block=False)
 plt.pause(0.0000001)
 plt.close()
 bg = fig.canvas.copy_from_bbox(fig.bbox)
@@ -325,10 +267,11 @@ old_fig_size = fig.get_size_inches()
 fig.canvas.blit(fig.bbox)
 
 
-
+#once everything is ready, turn on the faucet and start streaming in data
 fc = open("/tmp/xstreamControl", "ab")
 fc.write(b"\x01")
 fc.close()
+
 sleeptimer = 0
 latencycount = 0
 async def readin():
@@ -337,21 +280,17 @@ async def readin():
 		if faucet is False:
 			return
 		if flushflag is True:
-		     #   sys.stdin.flush()
 			starttime = time.time()
 			framecount = 0
 			flushflag = False
-			#continue
 		if decimationcount < (decimationfactor-1):
 			decimationcount += 1
 		else:
 			decimationcount = 0
 			linesplit = line.split("\t")
 			tempcharts[:, count] = np.asarray(linesplit, dtype=float)
-			#for i in range(numchannels):
-			#   tempcharts[i].append(float(linesplit[i]))
 			count += 1
-		if (count % appendlength == 0):
+		if (count - appendlength == 0):
 			if(old_fig_size != fig.get_size_inches()).any():
 		        	fig.canvas.flush_events()
 		        	bg = fig.canvas.copy_from_bbox(fig.bbox)
@@ -359,31 +298,21 @@ async def readin():
 			fig.canvas.restore_region(bg)
 			charts = np.concatenate((charts[:,appendlength:],tempcharts), axis=1)
 			for i in range(numchannels):
-				#print(i, curchannels[i])
 				plots[i].set_data(xvals, charts[curchannels[i]])
-				#if axes.flat[i] not in disabledaxes:
 				axes.flat[i].draw_artist(plots[i])
 			fig.canvas.blit(fig.bbox)
-			# fig.canvas.draw()
 			fig.canvas.flush_events()
 			framecount += appendlength * decimationfactor / 1000
-			#print("Time Since Start: %3.2f, Framecount: %5dk, Ideal: %5dk" % (time.time() - starttime, framecount, 48*(time.time()-starttime)))
 			latencyText.delete("1.0", "1.50")
 			latencyval = (48*(time.time()-starttime) - framecount)
 			latencyText.insert(INSERT, "Frame Delta: "+("%.0f"%(latencycount-latencyval))+"k")
 			latencycount = 0.1*latencyval + 0.9*latencycount
-			#if 48*(time.time()-starttime) - framecount < -100:
-			#	flushflag = True	    
-			count = 1
+			count = 0
 	print(time.time() - starttime)
 asyncio.run(readin())
 window.mainloop()
 
 
-#TODO: Flush sys.stdin upon reinit of fig
-#TODO: Make markers much more darker/visible, look into reinstating lines
-#TODO: Allow for zooming in beyond 2 frames
-#NOTE: Ideally, append enableFaucet(True) to the end of draw_idle
-#	OR: stop using draw_idle()
-
+#TODO: Flush sys.stdin upon reinit of fig ~~
+#TODO: Allow for zooming in EVEN FURTHER
 #Ideas on how to continue to zoom in. After a certain point, decrease decimation
