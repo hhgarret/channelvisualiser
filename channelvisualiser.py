@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import math
 from matplotlib.animation import FuncAnimation
+from matplotlib.widgets import CheckButtons
 from tkinter import *
 from matplotlib.backends.backend_tkagg import (FigureCanvasTkAgg, NavigationToolbar2Tk)
 import matplotlib.gridspec as gridspec
@@ -143,8 +144,15 @@ def init_fig():
 		    axes.flat[i-skipped].set_yticks([])
 		    axes.flat[i-skipped].set_xticks([])
 		    axes.flat[i-skipped].set_title((i+1), fontsize='small',loc='left')
+		    
 		
-		print(ms)
+		labels = [str(plot.get_label()) for plot in plots]
+		visibility = [plot.get_visible() for plot in plots]
+		#rax = fig.inset_axes([0.0, 0.0, 0.12,0.2])
+		#check = CheckButtons(rax, labels, visibility)
+		buttons = []
+			
+		#print(ms)
 		plt.tight_layout()
 		plt.connect('button_press_event', on_click)
 		canvas.get_tk_widget().pack_forget()
@@ -256,6 +264,13 @@ resetButton = Button(master = masterFrame, height = 1, command = lambda:resetfig
 resetButton.pack(side= BOTTOM)
 pauseButton = Button(master = masterFrame, height = 1, command = lambda:toggleFaucet(""), text="pause fig")
 pauseButton.pack(side=BOTTOM)
+mb = Menubutton(master = masterFrame, text="FFT Channels", relief=RAISED)
+#mb.grid()
+mb.menu = Menu(mb)
+mb['menu'] = mb.menu
+for i in range(maxchannels):
+	mb.menu.add_checkbutton(label=str(i+1))
+mb.pack()
 init_fig()
 window.attributes('-zoomed', True)
 
@@ -271,6 +286,11 @@ fig.canvas.blit(fig.bbox)
 fc = open("/tmp/xstreamControl", "ab")
 fc.write(b"\x01")
 fc.close()
+maxchannels = len(sys.stdin.readline().split("\t"))
+numchannels = maxchannels
+
+
+
 
 sleeptimer = 0
 latencycount = 0
@@ -299,6 +319,7 @@ async def readin():
 			charts = np.concatenate((charts[:,appendlength:],tempcharts), axis=1)
 			for i in range(numchannels):
 				plots[i].set_data(xvals, charts[curchannels[i]])
+				#plots[i].set_data(xvals, np.fft.fft(charts[curchannels[i]]))
 				axes.flat[i].draw_artist(plots[i])
 			fig.canvas.blit(fig.bbox)
 			fig.canvas.flush_events()
@@ -315,4 +336,5 @@ window.mainloop()
 
 #TODO: Flush sys.stdin upon reinit of fig ~~
 #TODO: Allow for zooming in EVEN FURTHER
+#TODO: Binary flag
 #Ideas on how to continue to zoom in. After a certain point, decrease decimation
