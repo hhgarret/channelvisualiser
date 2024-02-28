@@ -29,10 +29,8 @@ faucet = True
 disabledaxes = []
 disabledindex = []
 disabledcount = 0
-width = 4
-height = 6
-widthratios = [1]*width #for columns 0-3
-heightratios = [1]*height # for rows 0-5
+
+fftMode = False
 
 #The toggleFaucet method exists to interact with the xstream process, namely by turning on or off the flow of data from xstream to stdout/stdin.
 #This is achieved by writing either '0' or '1' to /tmp/xstreamControl, a pipe which is read in by xstream
@@ -114,13 +112,21 @@ def on_click(event):
 
 plots = []
 fig, axes = plt.subplots(2,2) 
+old_fig_size = fig.get_size_inches()
 #gs = axes[0,0].get_gridspec()
 xvals = range(totallength)
 ylim = 0.05
 flushflag = False
 #init_fig initalizes fig and axes for any given enabled channels. Called once at the start, and also whenever a channel is disabled.
 def init_fig():
-	global plots, totallength, fig, axes, xvals, ylim, numchannels, disabledindex, numchannels, canvas, window, maxchannels
+	print('init_fig')
+	global plots, totallength, fig, axes, xvals, ylim, numchannels, disabledindex, numchannels, canvas, window, maxchannels, fftMode, old_fig_size, decimationfactor, totallength, appendlength, charts, tempcharts
+	decimationfactor = 10
+	totallength = int(48000 / (2*decimationfactor))
+	appendlength = int(4800 / (decimationfactor))
+	charts = np.zeros((24, totallength))
+	tempcharts = np.zeros((24, appendlength))
+	fftMode = False
 	plots = []
 	xvals = range(totallength)
 	width, height = factor_int(numchannels)
@@ -160,9 +166,68 @@ def init_fig():
 		canvas = FigureCanvasTkAgg(fig, master = window)
 		canvas.draw()
 		canvas.get_tk_widget().pack(fill='both',expand=True,side='top')
+		old_fig_size = old_fig_size - [1,1]
 		diff =  (height*width) - numchannels
 		for i in range(1, diff+1):
 			axes.flat[-1*i].set_axis_off()
+
+
+def init_fft():
+	print('init_fft')
+	global plots, totallength, fig, axes, xvals, ylim, numchannels, disabledindex, numchannels, canvas, window, maxchannels, fftMode, prevselected, old_fig_size, decimationfactor, totallength, appendlength, charts, tempcharts
+	decimationfactor = 1
+	totallength = int(48000 / (2*decimationfactor))
+	appendlength = int(4800 / (decimationfactor))
+	charts = np.zeros((24, totallength))
+	tempcharts = np.zeros((24, appendlength))
+	fftMode = True
+	plots = []
+	xvals = range(totallength)
+	width, height = factor_int(len(prevselected))
+	print(width,height)
+	plt.close()
+	fig, axes = plt.subplots(nrows=height, ncols=width, squeeze=True, sharex=True,sharey=True)
+	ylim = .05
+	plt.connect('button_press_event', on_click)
+	plt.connect('draw_event', on_draw)
+	skipped = 0
+
+	if len(prevselected) > 1:
+		for count, i in enumerate(prevselected):
+		    #ms = "{:.1f}".format((2+(24-numchannels)/2)/10)
+		    pltline, = axes.flat[count].plot(charts[i], alpha=1, animated=True, zorder=10)
+		    plots.append(pltline)
+		    axes.flat[count].set_xlim(0, totallength/2)
+		    axes.flat[count].set_ylim(0, ylim*2)
+		    axes.flat[count].draw_artist(pltline)
+		    axes.flat[count].set_yticks([])
+		    axes.flat[count].set_xticks([])
+		    axes.flat[count].set_title((i+1), fontsize='small',loc='left')
+		plt.tight_layout()
+		plt.connect('button_press_event', on_click)
+		canvas.get_tk_widget().pack_forget()
+		canvas.get_tk_widget().destroy()
+		canvas = FigureCanvasTkAgg(fig, master = window)
+		canvas.draw()
+		canvas.get_tk_widget().pack(fill='both',expand=True,side='top')
+	elif len(prevselected) == 1:
+		#ms = "{:.1f}".format((2+(24-numchannels)/2)/10)
+		pltline, = axes.plot(charts[prevselected[0]], alpha=1, animated=True, zorder=10)
+		plots.append(pltline)
+		axes.set_xlim(0, totallength/2)
+		axes.set_ylim(0, ylim*2)
+		axes.draw_artist(pltline)
+		axes.set_yticks([])
+		axes.set_xticks([])
+		axes.set_title((prevselected[0]+1), fontsize='small',loc='left')
+		plt.tight_layout()
+		plt.connect('button_press_event', on_click)
+		canvas.get_tk_widget().pack_forget()
+		canvas.get_tk_widget().destroy()
+		canvas = FigureCanvasTkAgg(fig, master = window)
+		canvas.draw()
+		canvas.get_tk_widget().pack(fill='both',expand=True,side='top')
+	old_fig_size = old_fig_size - [1,1]
 
 
 window = Tk()
@@ -190,7 +255,7 @@ def updateheight(add_or_remove):
     fig.canvas.draw_idle()
 #updatewidth increases/decreases the xlim of the graphs & charts, either allowing more or less points/frames to be displayed
 def updatewidth(add_or_remove):
-    global axes, totallength, plt, xvals, width, height, charts, old_fig_size, decimationfactor, appendlength, count, decimationcount, tempcharts
+    global axes, totallength, plt, xvals, height, charts, old_fig_size, decimationfactor, appendlength, count, decimationcount, tempcharts
     if add_or_remove == "add":
         totallength += appendlength #increase width by a frame
         charts = np.append(np.zeros((24,appendlength)), charts, axis=1)
@@ -223,16 +288,17 @@ def updatewidth(add_or_remove):
     fig.canvas.draw_idle()
 #resetfig reenables all disabled axes 
 def resetfig():
-	global axes, fig, disabledaxes, old_fig_size, disabledindex, numchannels, maxchannels, curchannels
-	toggleFaucet(False)
-	disabledaxes = []
-	disabledindex = []
-	numchannels = maxchannels
-	curchannels = [elem for elem in range(maxchannels)]
-	print(curchannels, disabledaxes, disabledindex, numchannels)
-	init_fig()
-	old_fig_size = old_fig_size - [1,1]
-	toggleFaucet(True)
+	global axes, fig, disabledaxes, old_fig_size, disabledindex, numchannels, maxchannels, curchannels, fftMode
+	if fftMode == False:
+		toggleFaucet(False)
+		disabledaxes = []
+		disabledindex = []
+		numchannels = maxchannels
+		curchannels = [elem for elem in range(maxchannels)]
+		print(curchannels, disabledaxes, disabledindex, numchannels)
+		init_fig()
+		old_fig_size = old_fig_size - [1,1]
+		toggleFaucet(True)
 #tkinter window/gui creation
 masterFrame = Frame(master = window)
 masterFrame.pack()
@@ -264,13 +330,37 @@ resetButton = Button(master = masterFrame, height = 1, command = lambda:resetfig
 resetButton.pack(side= BOTTOM)
 pauseButton = Button(master = masterFrame, height = 1, command = lambda:toggleFaucet(""), text="pause fig")
 pauseButton.pack(side=BOTTOM)
-mb = Menubutton(master = masterFrame, text="FFT Channels", relief=RAISED)
+mb = Menubutton(masterFrame, text="FFT Channels", relief=RAISED)
 #mb.grid()
 mb.menu = Menu(mb)
+checkbuttonvars = []
+prevselected = []
+def printSelectedOptions():
+	global checkbuttonvars, prevselected
+	selectedOptions = [count for (count, var) in enumerate(checkbuttonvars) if var.get()]
+	latestOption = np.setdiff1d(selectedOptions, prevselected)
+	print(latestOption)
+	if len(selectedOptions) > 4:
+		checkbuttonvars[latestOption[0]].set(False)
+	else:
+		prevselected = selectedOptions
+	print(prevselected)
 mb['menu'] = mb.menu
 for i in range(maxchannels):
-	mb.menu.add_checkbutton(label=str(i+1))
+	var = BooleanVar()
+	checkbuttonvars.append(var)
+	mb.menu.add_checkbutton(variable=var, label=str(i+1), command=lambda:printSelectedOptions())
 mb.pack()
+fftToggleVar = IntVar()
+fftToggleVar.set(0)
+def fftToggleFunc():
+	global fftToggleVar
+	if(fftToggleVar.get() == 1):
+		init_fft()
+	else:
+		init_fig()
+fftToggle = Checkbutton(masterFrame, variable=fftToggleVar, text='FFT Mode', command=fftToggleFunc)
+fftToggle.pack()
 init_fig()
 window.attributes('-zoomed', True)
 
@@ -295,7 +385,7 @@ numchannels = maxchannels
 sleeptimer = 0
 latencycount = 0
 async def readin():
-	global flushflag, faucet, decimationcount, decimationfactor, fig, axes, tempcharts, count, old_fig_size, bg, charts, plots, framecount, sleeptimer, latencyText, starttime, latencycount
+	global flushflag, faucet, decimationcount, decimationfactor, fig, axes, tempcharts, count, old_fig_size, bg, charts, plots, framecount, sleeptimer, latencyText, starttime, latencycount, fftMode, prevselected
 	for line in sys.stdin:
 		if faucet is False:
 			return
@@ -317,10 +407,29 @@ async def readin():
 		        	old_fig_size = fig.get_size_inches()
 			fig.canvas.restore_region(bg)
 			charts = np.concatenate((charts[:,appendlength:],tempcharts), axis=1)
-			for i in range(numchannels):
-				plots[i].set_data(xvals, charts[curchannels[i]])
-				#plots[i].set_data(xvals, np.fft.fft(charts[curchannels[i]]))
-				axes.flat[i].draw_artist(plots[i])
+			if fftMode is False:
+				for i in range(numchannels):
+					plots[i].set_data(xvals, charts[curchannels[i]])
+					#plots[i].set_data(xvals, np.fft.fft(charts[curchannels[i]]))
+					axes.flat[i].draw_artist(plots[i])
+			elif len(prevselected) > 1:
+				for count, i in enumerate(prevselected):
+					y = np.fft.fft(charts[curchannels[i]])
+					y1, y2 = np.split(y, 2)
+					y2 = y2[::-1]
+					y = np.sqrt(np.square(y1) + np.square(y2))
+					x = range(len(y))
+					plots[count].set_data(x, y)
+					axes.flat[count].draw_artist(plots[count])
+			elif len(prevselected) == 1:
+				y = np.fft.fft(charts[curchannels[i]])
+				y1, y2 = np.split(y, 2)
+				y2 = y2[::-1]
+				y = np.sqrt(np.square(y1) + np.square(y2))
+				x = range(len(y))
+				plots[0].set_data(x, y)
+				plots[0].set_data(x,y)
+				axes.draw_artist(plots[0])
 			fig.canvas.blit(fig.bbox)
 			fig.canvas.flush_events()
 			framecount += appendlength * decimationfactor / 1000
@@ -338,3 +447,6 @@ window.mainloop()
 #TODO: Allow for zooming in EVEN FURTHER
 #TODO: Binary flag
 #Ideas on how to continue to zoom in. After a certain point, decrease decimation
+#TODO: rescale fft window, y = 0 -> ylim, x = 0 -> x/2
+
+#TODO: Implement FFT Mode (toggle, read in the selected channels, plot their rfft)
