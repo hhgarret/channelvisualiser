@@ -124,8 +124,8 @@ def init_fig():
 	decimationfactor = 10
 	totallength = int(48000 / (2*decimationfactor))
 	appendlength = int(4800 / (decimationfactor))
-	charts = np.zeros((24, totallength))
-	tempcharts = np.zeros((24, appendlength))
+	charts = np.zeros((maxchannels, totallength))
+	tempcharts = np.zeros((maxchannels, appendlength))
 	fftMode = False
 	plots = []
 	xvals = range(totallength)
@@ -141,7 +141,7 @@ def init_fig():
 		    if i in disabledindex:
 		    	skipped += 1
 		    	continue
-		    ms = "{:.1f}".format((2+(24-numchannels)/2)/10)
+		    ms = "{:.1f}".format((2+(maxchannels-numchannels)/2)/10)
 		    pltline, = axes.flat[i-skipped].plot(charts[i], '.k', ms=ms, ls='', alpha=1, animated=True, zorder=10)
 		    plots.append(pltline)
 		    axes.flat[i-skipped].set_xlim(0, totallength)
@@ -178,8 +178,8 @@ def init_fft():
 	decimationfactor = 1
 	totallength = int(48000 / (2*decimationfactor))
 	appendlength = int(4800 / (decimationfactor))
-	charts = np.zeros((24, totallength))
-	tempcharts = np.zeros((24, appendlength))
+	charts = np.zeros((maxchannels, totallength))
+	tempcharts = np.zeros((maxchannels, appendlength))
 	fftMode = True
 	plots = []
 	xvals = range(totallength)
@@ -194,7 +194,7 @@ def init_fft():
 
 	if len(prevselected) > 1:
 		for count, i in enumerate(prevselected):
-		    #ms = "{:.1f}".format((2+(24-numchannels)/2)/10)
+		    #ms = "{:.1f}".format((2+(maxchannels-numchannels)/2)/10)
 		    pltline, = axes.flat[count].plot(charts[i], alpha=1, animated=True, zorder=10)
 		    plots.append(pltline)
 		    axes.flat[count].set_xlim(0, totallength/2)
@@ -211,7 +211,7 @@ def init_fft():
 		canvas.draw()
 		canvas.get_tk_widget().pack(fill='both',expand=True,side='top')
 	elif len(prevselected) == 1:
-		#ms = "{:.1f}".format((2+(24-numchannels)/2)/10)
+		#ms = "{:.1f}".format((2+(maxchannels-numchannels)/2)/10)
 		pltline, = axes.plot(charts[prevselected[0]], alpha=1, animated=True, zorder=10)
 		plots.append(pltline)
 		axes.set_xlim(0, totallength/2)
@@ -258,7 +258,7 @@ def updatewidth(add_or_remove):
     global axes, totallength, plt, xvals, height, charts, old_fig_size, decimationfactor, appendlength, count, decimationcount, tempcharts
     if add_or_remove == "add":
         totallength += appendlength #increase width by a frame
-        charts = np.append(np.zeros((24,appendlength)), charts, axis=1)
+        charts = np.append(np.zeros((maxchannels,appendlength)), charts, axis=1)
         for i in range(numchannels):
             axes.flat[i].set_xlim(0, totallength)
         xvals = range(totallength)
@@ -276,7 +276,7 @@ def updatewidth(add_or_remove):
     	elif appendlength == 240:
     		appendlength = int(appendlength/2)
     		decimationfactor = 7
-    	tempcharts = np.zeros((24, appendlength))
+    	tempcharts = np.zeros((maxchannels, appendlength))
     	for i in range(numchannels):
     	    axes.flat[i].set_xlim(0, totallength)
     	xvals = range(totallength)
@@ -330,27 +330,7 @@ resetButton = Button(master = masterFrame, height = 1, command = lambda:resetfig
 resetButton.pack(side= BOTTOM)
 pauseButton = Button(master = masterFrame, height = 1, command = lambda:toggleFaucet(""), text="pause fig")
 pauseButton.pack(side=BOTTOM)
-mb = Menubutton(masterFrame, text="FFT Channels", relief=RAISED)
-#mb.grid()
-mb.menu = Menu(mb)
-checkbuttonvars = []
-prevselected = []
-def printSelectedOptions():
-	global checkbuttonvars, prevselected
-	selectedOptions = [count for (count, var) in enumerate(checkbuttonvars) if var.get()]
-	latestOption = np.setdiff1d(selectedOptions, prevselected)
-	print(latestOption)
-	if len(selectedOptions) > 4:
-		checkbuttonvars[latestOption[0]].set(False)
-	else:
-		prevselected = selectedOptions
-	print(prevselected)
-mb['menu'] = mb.menu
-for i in range(maxchannels):
-	var = BooleanVar()
-	checkbuttonvars.append(var)
-	mb.menu.add_checkbutton(variable=var, label=str(i+1), command=lambda:printSelectedOptions())
-mb.pack()
+
 fftToggleVar = IntVar()
 fftToggleVar.set(0)
 def fftToggleFunc():
@@ -373,14 +353,43 @@ fig.canvas.blit(fig.bbox)
 
 
 #once everything is ready, turn on the faucet and start streaming in data
-fc = open("/tmp/xstreamControl", "ab")
-fc.write(b"\x01")
-fc.close()
-maxchannels = len(sys.stdin.readline().split("\t"))
-numchannels = maxchannels
+try:
+	fc = open("/tmp/xstreamControl", "ab")
+	fc.write(b"\x01")
+	fc.close()
+except:
+	print("exception")
+tempmaxchannels = len(sys.stdin.readline().split("\t"))
+if(tempmaxchannels != maxchannels):
+	maxchannels = tempmaxchannels
+	numchannels = maxchannels
+	charts = np.zeros((maxchannels, totallength))
+	tempcharts = np.zeros((maxchannels, appendlength))
+	curchannels = [i for i in range(maxchannels)]
+print(maxchannels)
 
 
-
+mb = Menubutton(masterFrame, text="FFT Channels", relief=RAISED)
+#mb.grid()
+mb.menu = Menu(mb)
+checkbuttonvars = []
+prevselected = []
+def printSelectedOptions():
+	global checkbuttonvars, prevselected
+	selectedOptions = [count for (count, var) in enumerate(checkbuttonvars) if var.get()]
+	latestOption = np.setdiff1d(selectedOptions, prevselected)
+	print(latestOption)
+	if len(selectedOptions) > 4:
+		checkbuttonvars[latestOption[0]].set(False)
+	else:
+		prevselected = selectedOptions
+	print(prevselected)
+mb['menu'] = mb.menu
+for i in range(maxchannels):
+	var = BooleanVar()
+	checkbuttonvars.append(var)
+	mb.menu.add_checkbutton(variable=var, label=str(i+1), command=lambda:printSelectedOptions())
+mb.pack()
 
 sleeptimer = 0
 latencycount = 0
