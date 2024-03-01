@@ -177,7 +177,7 @@ def init_fft():
 	global plots, totallength, fig, axes, xvals, ylim, numchannels, disabledindex, numchannels, canvas, window, maxchannels, fftMode, prevselected, old_fig_size, decimationfactor, totallength, appendlength, charts, tempcharts
 	decimationfactor = 1
 	totallength = int(48000 / (2*decimationfactor))
-	appendlength = int(4800 / (decimationfactor))
+	appendlength = int(5*4800 / (decimationfactor))
 	charts = np.zeros((maxchannels, totallength))
 	tempcharts = np.zeros((maxchannels, appendlength))
 	fftMode = True
@@ -366,6 +366,7 @@ if(tempmaxchannels != maxchannels):
 	charts = np.zeros((maxchannels, totallength))
 	tempcharts = np.zeros((maxchannels, appendlength))
 	curchannels = [i for i in range(maxchannels)]
+	init_fig()
 print(maxchannels)
 
 
@@ -459,3 +460,5 @@ window.mainloop()
 #TODO: rescale fft window, y = 0 -> ylim, x = 0 -> x/2
 
 #TODO: Implement FFT Mode (toggle, read in the selected channels, plot their rfft)
+
+#TODO: Logscale x axis on FFT
