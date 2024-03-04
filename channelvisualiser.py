@@ -29,6 +29,9 @@ faucet = True
 disabledaxes = []
 disabledindex = []
 disabledcount = 0
+nyquist = 24000 #48k / 2
+fftlength = .25 #.25 of a second
+fftbinwidth = 1/fftlength #as fftlength decreases, binwidth increases
 
 fftMode = False
 
@@ -174,10 +177,10 @@ def init_fig():
 
 def init_fft():
 	print('init_fft')
-	global plots, totallength, fig, axes, xvals, ylim, numchannels, disabledindex, numchannels, canvas, window, maxchannels, fftMode, prevselected, old_fig_size, decimationfactor, totallength, appendlength, charts, tempcharts
+	global plots, totallength, fig, axes, xvals, ylim, numchannels, disabledindex, numchannels, canvas, window, maxchannels, fftMode, prevselected, old_fig_size, decimationfactor, totallength, appendlength, charts, tempcharts, fftlength, fftbinwidth, nyquist
 	decimationfactor = 1
-	totallength = int(48000 / (2*decimationfactor))
-	appendlength = int(5*4800 / (decimationfactor))
+	totallength = int(48000 * fftlength/ (decimationfactor))
+	appendlength = int(4800 / (decimationfactor))
 	charts = np.zeros((maxchannels, totallength))
 	tempcharts = np.zeros((maxchannels, appendlength))
 	fftMode = True
@@ -191,17 +194,18 @@ def init_fft():
 	plt.connect('button_press_event', on_click)
 	plt.connect('draw_event', on_draw)
 	skipped = 0
-
+	print(totallength)
 	if len(prevselected) > 1:
 		for count, i in enumerate(prevselected):
 		    #ms = "{:.1f}".format((2+(maxchannels-numchannels)/2)/10)
 		    pltline, = axes.flat[count].plot(charts[i], alpha=1, animated=True, zorder=10)
 		    plots.append(pltline)
-		    axes.flat[count].set_xlim(0, totallength/2)
+		    axes.flat[count].set_xlim(10, nyquist)
+		    #axes.flat[count].set_xscale("log")
 		    axes.flat[count].set_ylim(0, ylim*2)
 		    axes.flat[count].draw_artist(pltline)
-		    axes.flat[count].set_yticks([])
-		    axes.flat[count].set_xticks([])
+		    #axes.flat[count].set_yticks([])
+		    #axes.flat[count].set_xticks([])
 		    axes.flat[count].set_title((i+1), fontsize='small',loc='left')
 		plt.tight_layout()
 		plt.connect('button_press_event', on_click)
@@ -214,11 +218,12 @@ def init_fft():
 		#ms = "{:.1f}".format((2+(maxchannels-numchannels)/2)/10)
 		pltline, = axes.plot(charts[prevselected[0]], alpha=1, animated=True, zorder=10)
 		plots.append(pltline)
-		axes.set_xlim(0, totallength/2)
+		axes.set_xlim(10, nyquist)
+		#axes.set_xscale("log")
 		axes.set_ylim(0, ylim*2)
 		axes.draw_artist(pltline)
-		axes.set_yticks([])
-		axes.set_xticks([])
+		#axes.set_yticks([])
+		#axes.set_xticks([])
 		axes.set_title((prevselected[0]+1), fontsize='small',loc='left')
 		plt.tight_layout()
 		plt.connect('button_press_event', on_click)
@@ -395,7 +400,7 @@ mb.pack()
 sleeptimer = 0
 latencycount = 0
 async def readin():
-	global flushflag, faucet, decimationcount, decimationfactor, fig, axes, tempcharts, count, old_fig_size, bg, charts, plots, framecount, sleeptimer, latencyText, starttime, latencycount, fftMode, prevselected
+	global flushflag, faucet, decimationcount, decimationfactor, fig, axes, tempcharts, count, old_fig_size, bg, charts, plots, framecount, sleeptimer, latencyText, starttime, latencycount, fftMode, prevselected, fftbinwidth, nyquist
 	for line in sys.stdin:
 		if faucet is False:
 			return
@@ -428,7 +433,7 @@ async def readin():
 					y1, y2 = np.split(y, 2)
 					y2 = y2[::-1]
 					y = np.sqrt(np.square(y1) + np.square(y2))
-					x = range(len(y))
+					x = range(0, nyquist, int(fftbinwidth))
 					plots[count].set_data(x, y)
 					axes.flat[count].draw_artist(plots[count])
 			elif len(prevselected) == 1:
@@ -436,9 +441,9 @@ async def readin():
 				y1, y2 = np.split(y, 2)
 				y2 = y2[::-1]
 				y = np.sqrt(np.square(y1) + np.square(y2))
-				x = range(len(y))
+				x = range(0, nyquist, int(fftbinwidth))
 				plots[0].set_data(x, y)
-				plots[0].set_data(x,y)
+				plots[0].set_data(x, y)
 				axes.draw_artist(plots[0])
 			fig.canvas.blit(fig.bbox)
 			fig.canvas.flush_events()
