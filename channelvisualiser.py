@@ -30,7 +30,7 @@ disabledaxes = []
 disabledindex = []
 disabledcount = 0
 nyquist = 24000 #48k / 2
-fftlength = .25 #.25 of a second
+fftlength = .5 #.5 of a second
 fftbinwidth = 1/fftlength #as fftlength decreases, binwidth increases
 
 fftMode = False
@@ -180,7 +180,8 @@ def init_fft():
 	global plots, totallength, fig, axes, xvals, ylim, numchannels, disabledindex, numchannels, canvas, window, maxchannels, fftMode, prevselected, old_fig_size, decimationfactor, totallength, appendlength, charts, tempcharts, fftlength, fftbinwidth, nyquist
 	decimationfactor = 1
 	totallength = int(48000 * fftlength/ (decimationfactor))
-	appendlength = int(4800 / (decimationfactor))
+	fps = 8
+	appendlength = int(48000 / (decimationfactor * fps))
 	charts = np.zeros((maxchannels, totallength))
 	tempcharts = np.zeros((maxchannels, appendlength))
 	fftMode = True
@@ -339,11 +340,14 @@ pauseButton.pack(side=BOTTOM)
 fftToggleVar = IntVar()
 fftToggleVar.set(0)
 def fftToggleFunc():
-	global fftToggleVar
-	if(fftToggleVar.get() == 1):
+	global fftToggleVar, prevselected
+	if(fftToggleVar.get() == 0):
+		init_fig()
+	elif len(prevselected) > 0:
 		init_fft()
 	else:
 		init_fig()
+		fftToggleVar.set(False)
 fftToggle = Checkbutton(masterFrame, variable=fftToggleVar, text='FFT Mode', command=fftToggleFunc)
 fftToggle.pack()
 init_fig()
@@ -374,14 +378,13 @@ if(tempmaxchannels != maxchannels):
 	init_fig()
 print(maxchannels)
 
-
 mb = Menubutton(masterFrame, text="FFT Channels", relief=RAISED)
 #mb.grid()
 mb.menu = Menu(mb)
 checkbuttonvars = []
 prevselected = []
 def printSelectedOptions():
-	global checkbuttonvars, prevselected
+	global checkbuttonvars, prevselected, fftToggleVar
 	selectedOptions = [count for (count, var) in enumerate(checkbuttonvars) if var.get()]
 	latestOption = np.setdiff1d(selectedOptions, prevselected)
 	print(latestOption)
@@ -390,6 +393,8 @@ def printSelectedOptions():
 	else:
 		prevselected = selectedOptions
 	print(prevselected)
+	if(fftToggleVar.get() == 1):
+		init_fft()
 mb['menu'] = mb.menu
 for i in range(maxchannels):
 	var = BooleanVar()
@@ -437,7 +442,7 @@ async def readin():
 					plots[count].set_data(x, y)
 					axes.flat[count].draw_artist(plots[count])
 			elif len(prevselected) == 1:
-				y = np.fft.fft(charts[curchannels[i]])
+				y = np.fft.fft(charts[prevselected[0]])
 				y1, y2 = np.split(y, 2)
 				y2 = y2[::-1]
 				y = np.sqrt(np.square(y1) + np.square(y2))
