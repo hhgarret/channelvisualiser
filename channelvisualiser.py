@@ -10,7 +10,15 @@ import matplotlib.gridspec as gridspec
 import termios
 import matplotlib.ticker as ticker
 import asyncio
+import argparse
+import os
+import struct
 
+parser = argparse.ArgumentParser()
+parser.add_argument("-b", "--binary", help="Binary Flag", default=False, action='store_true')
+args = parser.parse_args()
+binaryFlag = args.binary
+#print("Binary {}".format(binaryFlag))
 
 #Some initial variable declarations. 
 starttime = time.time();
@@ -39,7 +47,7 @@ fftMode = False
 #This is achieved by writing either '0' or '1' to /tmp/xstreamControl, a pipe which is read in by xstream
 #When toggled off, the faucet flag is set to False, which turns off readin(). When turned back on, readin() should be also called.
 def toggleFaucet(onoroff):
-	global flushflag, faucet, fc
+	global flushflag, faucet, fc, binaryFlag
 	#print(onoroff)
 	if(onoroff == True):
 		fc = open("/tmp/xstreamControl", "ab")
@@ -47,25 +55,33 @@ def toggleFaucet(onoroff):
 		fc.close()
 		faucet = True
 		flushflag = True
-		asyncio.run(readin())
+		if binaryFlag is False:
+			asyncio.run(readin())
+		elif binaryFlag is True:
+			asyncio.run(readinbinary())
 	elif onoroff == False:
 		fc = open("/tmp/xstreamControl", "ab")
 		fc.write(b"\x00")
 		fc.close()
 		faucet = False
 		flushflag = True
+		#readflush()
 	else:
 		if faucet == True:
 			fc = open("/tmp/xstreamControl", "ab")
 			fc.write(b"\x00")
 			fc.close()
 			faucet = False
+			#readflush()
 		elif faucet == False:
 			fc = open("/tmp/xstreamControl", "ab")
 			fc.write(b"\x01")
 			fc.close()
 			faucet = True
-			asyncio.run(readin())
+			if binaryFlag is False:
+				asyncio.run(readin())
+			elif binaryFlag is True:
+				asyncio.run(readinbinary())
 	print(faucet)
 
 
@@ -96,11 +112,11 @@ def on_click(event):
 	#event.inaxes.set_axis_off()
 	if numchannels == 2:
 		return
-	if event.inaxes is not None:
+	if event.inaxes is not None and np.where(axes.flat == event.inaxes)[0][0] < numchannels:
 		event.inaxes.set_axis_off()
 		disabledaxes.append(event.inaxes)
 		actindex = considerateaddition(np.where(axes.flat == event.inaxes)[0][0], disabledindex)
-		print(actindex)
+		#print(actindex)
 		disabledindex.append(actindex)
 		numchannels -= 1
 	
@@ -263,8 +279,17 @@ def updateheight(add_or_remove):
 def updatewidth(add_or_remove):
     global axes, totallength, plt, xvals, height, charts, old_fig_size, decimationfactor, appendlength, count, decimationcount, tempcharts
     if add_or_remove == "add":
+        if totallength == 4800:
+        	return
         totallength += appendlength #increase width by a frame
-        charts = np.append(np.zeros((maxchannels,appendlength)), charts, axis=1)
+        if appendlength == 240 and totallength >= 960:
+        	appendlength = appendlength * 2
+        	print(appendlength)
+        	tempcharts = np.zeros((maxchannels, appendlength))
+        	count = 0
+        	decimationcount = 0
+        #charts = np.append(np.zeros((maxchannels,appendlength)), charts, axis=1)
+        charts = np.zeros((24, totallength))
         for i in range(numchannels):
             axes.flat[i].set_xlim(0, totallength)
         xvals = range(totallength)
@@ -278,10 +303,11 @@ def updatewidth(add_or_remove):
     else: #decrease, but below the current two frames... idea is to decrease df, increase frames
     	if appendlength == 480:
     		appendlength = int(appendlength/2)
-    		decimationfactor = 8
-    	elif appendlength == 240:
-    		appendlength = int(appendlength/2)
-    		decimationfactor = 7
+    		print(appendlength)
+    	#	decimationfactor = 8
+    	#elif appendlength == 240:
+    	#	appendlength = int(appendlength/2)
+    	#	decimationfactor = 7
     	tempcharts = np.zeros((maxchannels, appendlength))
     	for i in range(numchannels):
     	    axes.flat[i].set_xlim(0, totallength)
@@ -360,6 +386,20 @@ bg = fig.canvas.copy_from_bbox(fig.bbox)
 old_fig_size = fig.get_size_inches()
 fig.canvas.blit(fig.bbox)
 
+def read(n):
+	buffer = b""
+	while len(buffer) < n:
+		#data = sys.stdin.buffer.read(n - len(buffer))
+		data = os.read(0, n - len(buffer))
+		buffer += data
+	return buffer
+
+def readflush():
+	changelength = 1
+	while changelength > 0:
+		data = os.read(0, maxchannels*8)
+		changelength = len(data)
+
 
 #once everything is ready, turn on the faucet and start streaming in data
 try:
@@ -368,15 +408,30 @@ try:
 	fc.close()
 except:
 	print("exception")
-tempmaxchannels = len(sys.stdin.readline().split("\t"))
-if(tempmaxchannels != maxchannels):
-	maxchannels = tempmaxchannels
-	numchannels = maxchannels
-	charts = np.zeros((maxchannels, totallength))
-	tempcharts = np.zeros((maxchannels, appendlength))
-	curchannels = [i for i in range(maxchannels)]
-	init_fig()
-print(maxchannels)
+if binaryFlag is False:
+	tempmaxchannels = len(sys.stdin.readline().split("\t"))
+	if(tempmaxchannels != maxchannels):
+		maxchannels = tempmaxchannels
+		numchannels = maxchannels
+		charts = np.zeros((maxchannels, totallength))
+		tempcharts = np.zeros((maxchannels, appendlength))
+		curchannels = [i for i in range(maxchannels)]
+		init_fig()
+	print(maxchannels)
+elif binaryFlag is True:
+	sys.stdin.read
+	byte = read(1)
+	print(byte)
+	#byte = sys.stdin.buffer.read()
+	tempmaxchannels = struct.unpack('b', byte)[0]
+	if(tempmaxchannels != maxchannels):
+		maxchannels = tempmaxchannels
+		numchannels = maxchannels
+		charts = np.zeros((maxchannels, totallength))
+		tempcharts = np.zeros((maxchannels, appendlength))
+		curchannels = [i for i in range(maxchannels)]
+		init_fig()
+	print(maxchannels)
 
 mb = Menubutton(masterFrame, text="FFT Channels", relief=RAISED)
 #mb.grid()
@@ -459,16 +514,78 @@ async def readin():
 			latencycount = 0.1*latencyval + 0.9*latencycount
 			count = 0
 	print(time.time() - starttime)
-asyncio.run(readin())
+	
+
+async def readinbinary():
+	global flushflag, faucet, decimationcount, decimationfactor, fig, axes, tempcharts, count, old_fig_size, bg, charts, plots, framecount, sleeptimer, latencyText, starttime, latencycount, fftMode, prevselected, fftbinwidth, nyquist, maxchannels
+	structstring = '@'+('d'*maxchannels)
+	structsize = maxchannels*8
+	print(structstring)
+	while True:
+		if faucet is False:
+			return
+		if flushflag is True:
+			starttime = time.time()
+			framecount = 0
+			flushflag = False
+		if decimationcount < (decimationfactor-1):
+			nextpacket = read(structsize*(decimationfactor-1))
+			decimationcount += decimationfactor-1
+		else:
+			decimationcount = 0
+			nextpacket = None
+			nextpacket = read(structsize)
+			linesplit = struct.unpack(structstring, nextpacket)
+			#print(linesplit)
+			#linesplit = [i/INT_MAX for i in linesplit]
+			tempcharts[:, count] = np.asarray(linesplit, dtype=float)
+			count += 1
+		if (count - appendlength == 0):
+			if(old_fig_size != fig.get_size_inches()).any():
+		        	fig.canvas.flush_events()
+		        	bg = fig.canvas.copy_from_bbox(fig.bbox)
+		        	old_fig_size = fig.get_size_inches()
+			fig.canvas.restore_region(bg)
+			charts = np.concatenate((charts[:,appendlength:],tempcharts), axis=1)
+			if fftMode is False:
+				for i in range(numchannels):
+					plots[i].set_data(xvals, charts[curchannels[i]])
+					#plots[i].set_data(xvals, np.fft.fft(charts[curchannels[i]]))
+					axes.flat[i].draw_artist(plots[i])
+			elif len(prevselected) > 1:
+				for count, i in enumerate(prevselected):
+					y = np.fft.fft(charts[curchannels[i]])
+					y1, y2 = np.split(y, 2)
+					y2 = y2[::-1]
+					y = np.sqrt(np.square(y1) + np.square(y2))
+					x = range(0, nyquist, int(fftbinwidth))
+					plots[count].set_data(x, y)
+					axes.flat[count].draw_artist(plots[count])
+			elif len(prevselected) == 1:
+				y = np.fft.fft(charts[prevselected[0]])
+				y1, y2 = np.split(y, 2)
+				y2 = y2[::-1]
+				y = np.sqrt(np.square(y1) + np.square(y2))
+				x = range(0, nyquist, int(fftbinwidth))
+				plots[0].set_data(x, y)
+				plots[0].set_data(x, y)
+				axes.draw_artist(plots[0])
+			fig.canvas.blit(fig.bbox)
+			fig.canvas.flush_events()
+			framecount += appendlength * decimationfactor / 1000
+			latencyText.delete("1.0", "1.50")
+			latencyval = (48*(time.time()-starttime) - framecount)
+			latencyText.insert(INSERT, "Frame Delta: "+("%.0f"%(latencycount-latencyval))+"k")
+			latencycount = 0.1*latencyval + 0.9*latencycount
+			count = 0
+	print(time.time() - starttime)
+if binaryFlag is False:
+	asyncio.run(readin())
+elif binaryFlag is True:
+	asyncio.run(readinbinary())
 window.mainloop()
 
 
-#TODO: Flush sys.stdin upon reinit of fig ~~
-#TODO: Allow for zooming in EVEN FURTHER
-#TODO: Binary flag
-#Ideas on how to continue to zoom in. After a certain point, decrease decimation
-#TODO: rescale fft window, y = 0 -> ylim, x = 0 -> x/2
-
-#TODO: Implement FFT Mode (toggle, read in the selected channels, plot their rfft)
-
 #TODO: Logscale x axis on FFT
+
+#USE sys.stdin.buffer.read() instead of os.read!!!
