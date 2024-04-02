@@ -89,7 +89,8 @@ def toggleFaucet(onoroff):
 #If given 1 and [0,1,2,4], it would return 3 (can't place at 1, so check at +1. Can't place at 2, so check at +2. 3 is open, so return 3)
 def considerateaddition(n, arr):
 	saven = n
-	for num in arr:
+	sortarr = np.sort(arr)
+	for num in sortarr:
 		if num <= saven:
 			saven += 1
 	return saven
@@ -116,7 +117,8 @@ def on_click(event):
 		event.inaxes.set_axis_off()
 		disabledaxes.append(event.inaxes)
 		actindex = considerateaddition(np.where(axes.flat == event.inaxes)[0][0], disabledindex)
-		#print(actindex)
+		print(np.where(axes.flat == event.inaxes)[0][0], disabledindex)
+		print(actindex)
 		disabledindex.append(actindex)
 		numchannels -= 1
 	
@@ -156,6 +158,7 @@ def init_fig():
 	plt.connect('draw_event', on_draw)
 	skipped = 0
 	if maxchannels > 1:
+		#print(curchannels)
 		for count, i in enumerate(curchannels):
 		    ms = "{:.1f}".format((2+(maxchannels-numchannels)/2)/10)
 		    pltline, = axes.flat[count].plot(charts[i], '.k', ms=ms, ls='', alpha=1, animated=True, zorder=10)
