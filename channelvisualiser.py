@@ -139,7 +139,7 @@ flushflag = False
 #init_fig initalizes fig and axes for any given enabled channels. Called once at the start, and also whenever a channel is disabled.
 def init_fig():
 	print('init_fig')
-	global plots, totallength, fig, axes, xvals, ylim, numchannels, disabledindex, numchannels, canvas, window, maxchannels, fftMode, old_fig_size, decimationfactor, totallength, appendlength, charts, tempcharts
+	global plots, totallength, fig, axes, xvals, ylim, numchannels, disabledindex, numchannels, canvas, window, maxchannels, fftMode, old_fig_size, decimationfactor, totallength, appendlength, charts, tempcharts, curchannels
 	decimationfactor = 10
 	totallength = int(48000 / (2*decimationfactor))
 	appendlength = int(4800 / (decimationfactor))
@@ -156,19 +156,16 @@ def init_fig():
 	plt.connect('draw_event', on_draw)
 	skipped = 0
 	if maxchannels > 1:
-		for i in range(maxchannels):
-		    if i in disabledindex:
-		    	skipped += 1
-		    	continue
+		for count, i in enumerate(curchannels):
 		    ms = "{:.1f}".format((2+(maxchannels-numchannels)/2)/10)
-		    pltline, = axes.flat[i-skipped].plot(charts[i], '.k', ms=ms, ls='', alpha=1, animated=True, zorder=10)
+		    pltline, = axes.flat[count].plot(charts[i], '.k', ms=ms, ls='', alpha=1, animated=True, zorder=10)
 		    plots.append(pltline)
-		    axes.flat[i-skipped].set_xlim(0, totallength)
-		    axes.flat[i-skipped].set_ylim(-1*ylim, ylim)
-		    axes.flat[i-skipped].draw_artist(pltline)
-		    axes.flat[i-skipped].set_yticks([])
-		    axes.flat[i-skipped].set_xticks([])
-		    axes.flat[i-skipped].set_title((i+1), fontsize='small',loc='left')
+		    axes.flat[count].set_xlim(0, totallength)
+		    axes.flat[count].set_ylim(-1*ylim, ylim)
+		    axes.flat[count].draw_artist(pltline)
+		    axes.flat[count].set_yticks([])
+		    axes.flat[count].set_xticks([])
+		    axes.flat[count].set_title((i+1), fontsize='small',loc='left')
 		    
 		
 		labels = [str(plot.get_label()) for plot in plots]
@@ -380,8 +377,8 @@ init_fig()
 window.attributes('-zoomed', True)
 
 
-plt.pause(0.0000001)
-plt.close()
+#plt.pause(0.0000001)
+#plt.close()
 bg = fig.canvas.copy_from_bbox(fig.bbox)
 old_fig_size = fig.get_size_inches()
 fig.canvas.blit(fig.bbox)

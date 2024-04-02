@@ -50,7 +50,7 @@ def changeselected(leftorright):
 	else:
 		curselected = (curselected + 1)%maxchannels
 	selection.delete("1.0", "1.100")
-	selection.insert(INSERT, "Selected: "+str(curselected))
+	selection.insert(INSERT, "Selected: "+str(curselected+1))
 #the on_draw method is called whenever the on_draw event is triggered
 def on_draw(event):
 	a = 1
@@ -85,7 +85,7 @@ def init_fig():
 	ylim = .05
 	plt.connect('draw_event', on_draw)
 	skipped = 0
-	pltline, = axes.plot(charts[curselected], '.k', ms=".10", ls='', alpha=1, animated=True, zorder=10)
+	pltline, = axes.plot(charts[curselected], '.k', ms=".25", ls='', alpha=1, animated=True, zorder=10)
 	plots = pltline
 	axes.set_xlim(0, totallength)
 	axes.set_ylim(-1*ylim, ylim)
@@ -133,21 +133,22 @@ masterFrame.pack()
 
 selectionFrame = Frame(master = masterFrame)
 selectionFrame.pack()
-selectleft = Button(master = selectionFrame, command = lambda:updatewidth("add"), height=2, width=20, text="<--")
-selectleft.pack()
-window.bind('<Right>', lambda event:changeselected("left"))
-selection = Text(master = selectionFrame, height = 1)
-selection.insert(INSERT, "Selected: "+str(curselected))
-selection.pack()
-selectright = Button(master = selectionFrame, command = lambda:updatewidth("remove"), height=2, width=20, text="-->")
-selectright.pack()
-window.bind('<Left>', lambda event:changeselected("right"))
+selectleft = Button(master = selectionFrame, command = lambda:updatewidth("add"), height=2, width=10, text="<--")
+selectleft.pack(side=LEFT, expand=1)
+window.bind('<Right>', lambda event:changeselected("right"))
+selection = Text(master = selectionFrame, height = 2, width=40)
+selection.insert(INSERT, "Selected: "+str(curselected+1))
+#selection.place(x=10, width=400)
+selection.pack(side=LEFT, expand=1)
+selectright = Button(master = selectionFrame, command = lambda:updatewidth("remove"), height=2, width=10, text="-->")
+selectright.pack(side=LEFT, expand=1)
+window.bind('<Left>', lambda event:changeselected("left"))
 
 init_fig()
 window.attributes('-zoomed', True)
 
 
-plt.pause(0.0000001)
+#plt.pause(0.0000001)
 plt.close()
 bg = fig.canvas.copy_from_bbox(fig.bbox)
 old_fig_size = fig.get_size_inches()
@@ -177,11 +178,11 @@ if binaryFlag is False:
 		tempcharts = np.zeros((maxchannels, appendlength))
 		curchannels = [i for i in range(maxchannels)]
 		init_fig()
-	print(maxchannels)
+	#print(maxchannels)
 elif binaryFlag is True:
 	sys.stdin.read
 	byte = read(1)
-	print(byte)
+	#print(byte)
 	#byte = sys.stdin.buffer.read()
 	tempmaxchannels = struct.unpack('b', byte)[0]
 	if(tempmaxchannels != maxchannels):
@@ -231,7 +232,7 @@ async def readinbinary():
 	global flushflag, faucet, decimationcount, decimationfactor, fig, axes, tempcharts, count, old_fig_size, bg, charts, plots, framecount, sleeptimer, latencyText, starttime, latencycount, fftMode, prevselected, fftbinwidth, nyquist, maxchannels, curselected
 	structstring = '@'+('d'*maxchannels)
 	structsize = maxchannels*8
-	print(structstring)
+	#print(structstring)
 	while True:
 		if faucet is False:
 			return
@@ -263,13 +264,9 @@ async def readinbinary():
 			fig.canvas.blit(fig.bbox)
 			fig.canvas.flush_events()
 			count = 0
-	print(time.time() - starttime)
 if binaryFlag is False:
 	asyncio.run(readin())
 elif binaryFlag is True:
 	asyncio.run(readinbinary())
 window.mainloop()
 
-
-
-#USE sys.stdin.buffer.read() instead of os.read?
