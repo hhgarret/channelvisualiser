@@ -27,6 +27,7 @@ decimationcount = 0
 count = 0
 totallength = int(48000 / (2*decimationfactor))
 appendlength = int(4800 / (decimationfactor))
+appendlengthsave = 0
 maxchannels = 24
 numchannels = 24
 charts = np.zeros((24, totallength))
@@ -137,6 +138,7 @@ old_fig_size = fig.get_size_inches()
 #gs = axes[0,0].get_gridspec()
 xvals = range(totallength)
 ylim = 0.05
+fftylim = 1
 flushflag = False
 #init_fig initalizes fig and axes for any given enabled channels. Called once at the start, and also whenever a channel is disabled.
 def init_fig():
@@ -193,11 +195,12 @@ def init_fig():
 
 def init_fft():
 	print('init_fft')
-	global plots, totallength, fig, axes, xvals, ylim, numchannels, disabledindex, numchannels, canvas, window, maxchannels, fftMode, prevselected, old_fig_size, decimationfactor, totallength, appendlength, charts, tempcharts, fftlength, fftbinwidth, nyquist
+	global plots, totallength, fig, axes, xvals, ylim, numchannels, disabledindex, numchannels, canvas, window, maxchannels, fftMode, prevselected, old_fig_size, decimationfactor, totallength, appendlength, charts, tempcharts, fftlength, fftbinwidth, nyquist, appendlengthsave
 	decimationfactor = 1
 	totallength = int(48000 * fftlength/ (decimationfactor))
 	fps = 8
 	appendlength = int(48000 / (decimationfactor * fps))
+	appendlengthsave = appendlength
 	charts = np.zeros((maxchannels, totallength))
 	tempcharts = np.zeros((maxchannels, appendlength))
 	fftMode = True
@@ -261,63 +264,83 @@ canvas.get_tk_widget().pack(fill='both',expand=True,side='top')
 
 #updateheight increases/decreases the ylim of the graphs
 def updateheight(add_or_remove):
-    global axes, ylim, plt, old_fig_size
-    #toggleFaucet(False)
-    if add_or_remove == "add":
-        ylim *= 1.5
-        yText.delete("1.0", "1.60")
-        yText.insert(INSERT, "Height: +/-"+("%.4f"%ylim))
-    else:
-        ylim *= 1/1.5
-        yText.delete("1.0", "1.60")
-        yText.insert(INSERT, "Height: +/-"+("%.4f"%ylim))
-    for i in range(numchannels):
-        axes.flat[i].set_ylim(-1*ylim, ylim)
-    old_fig_size = old_fig_size - [1,1]
-    fig.canvas.draw_idle()
+	global axes, ylim, plt, old_fig_size, fftylim, prevselected
+	#toggleFaucet(False)
+	if fftMode is False:
+		if add_or_remove == "add":
+			ylim *= 1.5
+			yText.delete("1.0", "1.60")
+			yText.insert(INSERT, "Height: +/-"+("%.4f"%ylim))
+		else:
+			ylim *= 1/1.5
+			yText.delete("1.0", "1.60")
+			yText.insert(INSERT, "Height: +/-"+("%.4f"%ylim))
+		for i in range(numchannels):
+			axes.flat[i].set_ylim(-1*ylim, ylim)
+		old_fig_size = old_fig_size - [1,1]
+		fig.canvas.draw_idle()
+	elif fftMode is True:
+		if add_or_remove == "add":
+			ylim *= 1.5
+		else:
+			ylim *= 1/1.5
+		if len(prevselected) > 1:
+			for i in range(len(prevselected)):
+				axes.flat[i].set_ylim(0, ylim)
+		elif len(prevselected) == 1:
+			axes.set_ylim(0, ylim)
+		yText.delete("1.0", "1.60")
+		yText.insert(INSERT, "Height: +"+("%.4f"%ylim))
+		old_fig_size = old_fig_size - [1,1]
+		fig.canvas.draw_idle()
 #updatewidth increases/decreases the xlim of the graphs & charts, either allowing more or less points/frames to be displayed
 def updatewidth(add_or_remove):
-    global axes, totallength, plt, xvals, height, charts, old_fig_size, decimationfactor, appendlength, count, decimationcount, tempcharts
-    if add_or_remove == "add":
-        if totallength == 4800:
-        	return
-        totallength += appendlength #increase width by a frame
-        if appendlength == 240 and totallength >= 960:
-        	appendlength = appendlength * 2
-        	print(appendlength)
-        	tempcharts = np.zeros((maxchannels, appendlength))
-        	count = 0
-        	decimationcount = 0
-        #charts = np.append(np.zeros((maxchannels,appendlength)), charts, axis=1)
-        charts = np.zeros((24, totallength))
-        for i in range(numchannels):
-            axes.flat[i].set_xlim(0, totallength)
-        xvals = range(totallength)
-    elif totallength > 2*appendlength:
-        totallength -= appendlength
-        charts = charts[:, appendlength:]
-        for i in range(numchannels):
-            axes.flat[i].set_xlim(0, totallength)
-        xvals = range(totallength)
-       
-    else: #decrease, but below the current two frames... idea is to decrease df, increase frames
-    	if appendlength == 480:
-    		appendlength = int(appendlength/2)
-    		print(appendlength)
-    	#	decimationfactor = 8
-    	#elif appendlength == 240:
-    	#	appendlength = int(appendlength/2)
-    	#	decimationfactor = 7
-    	tempcharts = np.zeros((maxchannels, appendlength))
-    	for i in range(numchannels):
-    	    axes.flat[i].set_xlim(0, totallength)
-    	xvals = range(totallength)
-    	count = 0
-    	decimationcount = 0
-    xText.delete("1.0", "1.100")
-    xText.insert(INSERT, "Width: "+("%.0f"%(totallength*decimationfactor))+" samples (undecimated), decimation of "+str(decimationfactor))
-    old_fig_size = old_fig_size - [1,1]
-    fig.canvas.draw_idle()
+	global axes, totallength, plt, xvals, height, charts, old_fig_size, decimationfactor, appendlength, count, decimationcount, tempcharts, prevselected, nyquist, fftlength, fftbinwidth, appendlengthsave
+	if fftMode == False:
+		if add_or_remove == "add":
+			if totallength == 4800:
+				return
+			totallength += appendlength #increase width by a frame
+			if appendlength == 240 and totallength >= 960:
+				appendlength = appendlength * 2
+			tempcharts = np.zeros((maxchannels, appendlength))
+			count = 0
+			decimationcount = 0
+			charts = np.zeros((24, totallength))
+			for i in range(numchannels):
+				axes.flat[i].set_xlim(0, totallength)
+			xvals = range(totallength)
+		elif totallength > 2*appendlength:
+			totallength -= appendlength
+			charts = charts[:, appendlength:]
+			for i in range(numchannels):
+				axes.flat[i].set_xlim(0, totallength)
+			xvals = range(totallength)
+		else:
+			if appendlength == 480:
+				appendlength = int(appendlength/2)
+				print(appendlength)
+			tempcharts = np.zeros((maxchannels, appendlength))
+			for i in range(numchannels):
+				axes.flat[i].set_xlim(0, totallength)
+			xvals = range(totallength)
+			count = 0
+			decimationcount = 0
+		xText.delete("1.0", "1.100")
+		xText.insert(INSERT, "Width: "+("%.0f"%(totallength*decimationfactor))+" samples (undecimated), decimation of "+str(decimationfactor))
+		old_fig_size = old_fig_size - [1,1]
+		fig.canvas.draw_idle()
+	elif fftMode == True: #in fftmode, only want to change appendlength
+		if add_or_remove == "add" and appendlength < totallength:
+			appendlength += int(appendlengthsave/2)
+		elif appendlength > appendlengthsave/2:
+			appendlength -= int(appendlengthsave/2)
+		xText.delete("1.0", "1.100")
+		xText.insert(INSERT, "Appendlength: "+str(appendlength))
+		tempcharts = np.zeros((maxchannels, appendlength))
+		count = 0
+		decimationcount = 0
+		xvals = range(totallength)
 #resetfig reenables all disabled axes 
 def resetfig():
 	global axes, fig, disabledaxes, old_fig_size, disabledindex, numchannels, maxchannels, curchannels, fftMode
@@ -503,7 +526,6 @@ async def readin():
 				y = np.sqrt(np.square(y1) + np.square(y2))
 				x = range(0, nyquist, int(fftbinwidth))
 				plots[0].set_data(x, y)
-				plots[0].set_data(x, y)
 				axes.draw_artist(plots[0])
 			fig.canvas.blit(fig.bbox)
 			fig.canvas.flush_events()
@@ -589,3 +611,5 @@ window.mainloop()
 #TODO: Logscale x axis on FFT
 
 #USE sys.stdin.buffer.read() instead of os.read!!!
+#change changex and changey behaviour for fftmode, such that y goes from 0 to y, and x changes
+#num of samples
