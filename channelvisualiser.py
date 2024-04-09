@@ -15,10 +15,10 @@ import os
 import struct
 
 parser = argparse.ArgumentParser()
-parser.add_argument("-b", "--binary", help="Binary Flag", default=False, action='store_true')
+parser.add_argument("--human", help="Human Readable Flag", default=False, action='store_true')
 args = parser.parse_args()
-binaryFlag = args.binary
-#print("Binary {}".format(binaryFlag))
+humanFlag = args.human
+#print("Human Readable: {}".format(humanFlag ))
 
 #Some initial variable declarations. 
 starttime = time.time();
@@ -48,7 +48,7 @@ fftMode = False
 #This is achieved by writing either '0' or '1' to /tmp/xstreamControl, a pipe which is read in by xstream
 #When toggled off, the faucet flag is set to False, which turns off readin(). When turned back on, readin() should be also called.
 def toggleFaucet(onoroff):
-	global flushflag, faucet, fc, binaryFlag
+	global flushflag, faucet, fc, v
 	#print(onoroff)
 	if(onoroff == True):
 		fc = open("/tmp/xstreamControl", "ab")
@@ -56,9 +56,9 @@ def toggleFaucet(onoroff):
 		fc.close()
 		faucet = True
 		flushflag = True
-		if binaryFlag is False:
+		if humanFlag  is True:
 			asyncio.run(readin())
-		elif binaryFlag is True:
+		elif humanFlag  is False:
 			asyncio.run(readinbinary())
 	elif onoroff == False:
 		fc = open("/tmp/xstreamControl", "ab")
@@ -79,9 +79,9 @@ def toggleFaucet(onoroff):
 			fc.write(b"\x01")
 			fc.close()
 			faucet = True
-			if binaryFlag is False:
+			if humanFlag  is True:
 				asyncio.run(readin())
-			elif binaryFlag is True:
+			elif humanFlag  is False:
 				asyncio.run(readinbinary())
 	print(faucet)
 
@@ -431,7 +431,7 @@ try:
 	fc.close()
 except:
 	print("exception")
-if binaryFlag is False:
+if humanFlag is True:
 	tempmaxchannels = len(sys.stdin.readline().split("\t"))
 	if(tempmaxchannels != maxchannels):
 		maxchannels = tempmaxchannels
@@ -441,7 +441,7 @@ if binaryFlag is False:
 		curchannels = [i for i in range(maxchannels)]
 		init_fig()
 	print(maxchannels)
-elif binaryFlag is True:
+elif humanFlag  is False:
 	sys.stdin.read
 	byte = read(1)
 	print(byte)
@@ -601,9 +601,9 @@ async def readinbinary():
 			latencycount = 0.1*latencyval + 0.9*latencycount
 			count = 0
 	print(time.time() - starttime)
-if binaryFlag is False:
+if humanFlag  is True:
 	asyncio.run(readin())
-elif binaryFlag is True:
+elif humanFlag  is False:
 	asyncio.run(readinbinary())
 window.mainloop()
 

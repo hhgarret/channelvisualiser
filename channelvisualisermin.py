@@ -15,10 +15,9 @@ import os
 import struct
 
 parser = argparse.ArgumentParser()
-parser.add_argument("-b", "--binary", help="Binary Flag", default=False, action='store_true')
+parser.add_argument("--human", help="Human Readable Flag", default=False, action='store_true')
 args = parser.parse_args()
-binaryFlag = args.binary
-#print("Binary {}".format(binaryFlag))
+humanFlag = args.human
 
 #Some initial variable declarations. 
 starttime = time.time();
@@ -85,7 +84,8 @@ def init_fig():
 	ylim = .05
 	plt.connect('draw_event', on_draw)
 	skipped = 0
-	pltline, = axes.plot(charts[curselected], '.k', ms=".25", ls='', alpha=1, animated=True, zorder=10)
+	#pltline, = axes.plot(charts[curselected], 'ok', ms=".25", ls='', alpha=1, animated=True, zorder=10)
+	pltline, = axes.plot(charts[curselected], animated=True, zorder=10)
 	plots = pltline
 	axes.set_xlim(0, totallength)
 	axes.set_ylim(-1*ylim, ylim)
@@ -169,7 +169,7 @@ def readflush():
 		changelength = len(data)
 
 
-if binaryFlag is False:
+if humanFlag is True:
 	tempmaxchannels = len(sys.stdin.readline().split("\t"))
 	if(tempmaxchannels != maxchannels):
 		maxchannels = tempmaxchannels
@@ -179,7 +179,7 @@ if binaryFlag is False:
 		curchannels = [i for i in range(maxchannels)]
 		init_fig()
 	#print(maxchannels)
-elif binaryFlag is True:
+elif humanFlag is False:
 	sys.stdin.read
 	byte = read(1)
 	#print(byte)
@@ -264,9 +264,9 @@ async def readinbinary():
 			fig.canvas.blit(fig.bbox)
 			fig.canvas.flush_events()
 			count = 0
-if binaryFlag is False:
+if humanFlag is True:
 	asyncio.run(readin())
-elif binaryFlag is True:
+elif humanFlag is False:
 	asyncio.run(readinbinary())
 window.mainloop()
 
