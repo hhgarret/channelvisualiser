@@ -16,8 +16,13 @@ import struct
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--human", help="Human Readable Flag", default=False, action='store_true')
+parser.add_argument("--channels", help="Sequential channels indexed at 1, i.e., '--channels 1 2 3 4'", nargs='+', type=int)
 args = parser.parse_args()
 humanFlag = args.human
+limitchannels = args.channels
+
+if limitchannels != None:
+	print(limitchannels)
 #print("Human Readable: {}".format(humanFlag ))
 
 #Some initial variable declarations. 
@@ -143,7 +148,13 @@ flushflag = False
 #init_fig initalizes fig and axes for any given enabled channels. Called once at the start, and also whenever a channel is disabled.
 def init_fig():
 	print('init_fig')
-	global plots, totallength, fig, axes, xvals, ylim, numchannels, disabledindex, numchannels, canvas, window, maxchannels, fftMode, old_fig_size, decimationfactor, totallength, appendlength, charts, tempcharts, curchannels
+	global plots, totallength, fig, axes, xvals, ylim, numchannels, disabledindex, numchannels, canvas, window, maxchannels, fftMode, old_fig_size, decimationfactor, totallength, appendlength, charts, tempcharts, curchannels, limitchannels
+	print(curchannels)
+	if limitchannels != None:
+		newcurchannels = [value for value in limitchannels if value in curchannels]
+		curchannels = newcurchannels
+		numchannels = len(curchannels)
+	print(curchannels)
 	decimationfactor = 10
 	totallength = int(48000 / (2*decimationfactor))
 	appendlength = int(4800 / (decimationfactor))
@@ -475,6 +486,9 @@ def printSelectedOptions():
 		init_fft()
 mb['menu'] = mb.menu
 for i in range(maxchannels):
+	if limitchannels != None:
+		if i+1 not in limitchannels:
+			continue
 	var = BooleanVar()
 	checkbuttonvars.append(var)
 	mb.menu.add_checkbutton(variable=var, label=str(i+1), command=lambda:printSelectedOptions())
