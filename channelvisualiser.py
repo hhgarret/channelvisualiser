@@ -22,7 +22,8 @@ humanFlag = args.human
 limitchannels = args.channels
 
 if limitchannels != None:
-	print(limitchannels)
+	#print(limitchannels)
+	limitchannels = [channel-1 for channel in limitchannels]
 #print("Human Readable: {}".format(humanFlag ))
 
 #Some initial variable declarations. 
@@ -123,8 +124,8 @@ def on_click(event):
 		event.inaxes.set_axis_off()
 		disabledaxes.append(event.inaxes)
 		actindex = considerateaddition(np.where(axes.flat == event.inaxes)[0][0], disabledindex)
-		print(np.where(axes.flat == event.inaxes)[0][0], disabledindex)
-		print(actindex)
+		#print(np.where(axes.flat == event.inaxes)[0][0], disabledindex)
+		#print(actindex)
 		disabledindex.append(actindex)
 		numchannels -= 1
 	
@@ -135,7 +136,6 @@ def on_click(event):
 		curset = allchannels - dischannels
 		curchannels = [elem for elem in curset]
 		init_fig()
-
 
 plots = []
 fig, axes = plt.subplots(2,2) 
@@ -148,14 +148,15 @@ flushflag = False
 #init_fig initalizes fig and axes for any given enabled channels. Called once at the start, and also whenever a channel is disabled.
 def init_fig():
 	print('init_fig')
-	global plots, totallength, fig, axes, xvals, ylim, numchannels, disabledindex, numchannels, canvas, window, maxchannels, fftMode, old_fig_size, decimationfactor, totallength, appendlength, charts, tempcharts, curchannels, limitchannels
-	print(curchannels)
+	global plots, totallength, fig, axes, xvals, ylim, numchannels, disabledindex, numchannels, canvas, window, maxchannels, fftMode, old_fig_size, decimationfactor, totallength, appendlength, charts, tempcharts, curchannels, limitchannels, xText
+	#print(curchannels)
 	if limitchannels != None:
 		newcurchannels = [value for value in limitchannels if value in curchannels]
 		curchannels = newcurchannels
 		numchannels = len(curchannels)
-	print(curchannels)
-	decimationfactor = 10
+	#print(curchannels)
+	decimationfactor = max(10-int((maxchannels - len(curchannels))/2.5), 2)
+	#print(decimationfactor)
 	totallength = int(48000 / (2*decimationfactor))
 	appendlength = int(4800 / (decimationfactor))
 	charts = np.zeros((maxchannels, totallength))
@@ -167,9 +168,11 @@ def init_fig():
 	plt.close()
 	fig, axes = plt.subplots(nrows=height, ncols=width, squeeze=True, sharex=True,sharey=True)
 	ylim = .05
+	#font = {'size' : 12}
+	#plt.rc('font', **font)
 	plt.connect('button_press_event', on_click)
 	plt.connect('draw_event', on_draw)
-	skipped = 0
+	
 	if maxchannels > 1:
 		#print(curchannels)
 		for count, i in enumerate(curchannels):
@@ -179,9 +182,11 @@ def init_fig():
 		    axes.flat[count].set_xlim(0, totallength)
 		    axes.flat[count].set_ylim(-1*ylim, ylim)
 		    axes.flat[count].draw_artist(pltline)
+		    
 		    axes.flat[count].set_yticks([])
 		    axes.flat[count].set_xticks([])
-		    axes.flat[count].set_title((i+1), fontsize='small',loc='left')
+		    axes.flat[count].set_title("Ch. "+str(i+1), fontsize='small',loc='left')
+		    #axes.flat[count].grid(visible=True, which='major', axis='both')
 		    
 		
 		labels = [str(plot.get_label()) for plot in plots]
@@ -191,7 +196,11 @@ def init_fig():
 		buttons = []
 			
 		#print(ms)
-		plt.tight_layout()
+		#plt.tight_layout()
+		fig.set_tight_layout(True)
+		
+		fig.text(0.5, 0.001, 'Samples', ha='center')
+		fig.text(0.001, 0.5, 'Amplitude', va='center', rotation='vertical')
 		plt.connect('button_press_event', on_click)
 		canvas.get_tk_widget().pack_forget()
 		canvas.get_tk_widget().destroy()
@@ -202,6 +211,8 @@ def init_fig():
 		diff =  (height*width) - numchannels
 		for i in range(1, diff+1):
 			axes.flat[-1*i].set_axis_off()
+		xText.delete("1.0", "1.100")
+		xText.insert(INSERT, "Width: "+("%.0f"%(totallength*decimationfactor))+" samples (undecimated), decimation of "+str(decimationfactor))
 
 
 def init_fft():
@@ -218,14 +229,18 @@ def init_fft():
 	plots = []
 	xvals = range(totallength)
 	width, height = factor_int(len(prevselected))
-	print(width,height)
+	#print(width,height)
 	plt.close()
 	fig, axes = plt.subplots(nrows=height, ncols=width, squeeze=True, sharex=True,sharey=True)
-	ylim = .05
+	ylim = 10
+	font = {'family' : 'normal',
+		'weight' : 'bold',
+		'size' : 12}
+	plt.rc('font', **font)
 	plt.connect('button_press_event', on_click)
 	plt.connect('draw_event', on_draw)
 	skipped = 0
-	print(totallength)
+	#print(totallength)
 	if len(prevselected) > 1:
 		for count, i in enumerate(prevselected):
 		    #ms = "{:.1f}".format((2+(maxchannels-numchannels)/2)/10)
@@ -233,11 +248,12 @@ def init_fft():
 		    plots.append(pltline)
 		    axes.flat[count].set_xlim(10, nyquist)
 		    #axes.flat[count].set_xscale("log")
-		    axes.flat[count].set_ylim(0, ylim*2)
+		    axes.flat[count].set_ylim(0.001, ylim*2)
+		    axes.flat[count].set_yscale("log")
 		    axes.flat[count].draw_artist(pltline)
 		    #axes.flat[count].set_yticks([])
 		    #axes.flat[count].set_xticks([])
-		    axes.flat[count].set_title((i+1), fontsize='small',loc='left')
+		    axes.flat[count].set_title("Ch. "+str(i+1), fontsize='small',loc='left')
 		plt.tight_layout()
 		plt.connect('button_press_event', on_click)
 		canvas.get_tk_widget().pack_forget()
@@ -251,7 +267,8 @@ def init_fft():
 		plots.append(pltline)
 		axes.set_xlim(10, nyquist)
 		#axes.set_xscale("log")
-		axes.set_ylim(0, ylim*2)
+		axes.set_ylim(0.001, ylim)
+		axes.set_yscale("log")
 		axes.draw_artist(pltline)
 		#axes.set_yticks([])
 		#axes.set_xticks([])
@@ -330,7 +347,7 @@ def updatewidth(add_or_remove):
 		else:
 			if appendlength == 480:
 				appendlength = int(appendlength/2)
-				print(appendlength)
+				#print(appendlength)
 			tempcharts = np.zeros((maxchannels, appendlength))
 			for i in range(numchannels):
 				axes.flat[i].set_xlim(0, totallength)
@@ -344,7 +361,7 @@ def updatewidth(add_or_remove):
 	elif fftMode == True: #in fftmode, only want to change appendlength
 		if add_or_remove == "add" and appendlength < totallength:
 			appendlength += int(appendlengthsave/2)
-		elif appendlength > appendlengthsave/2:
+		elif appendlength > appendlengthsave:
 			appendlength -= int(appendlengthsave/2)
 		xText.delete("1.0", "1.100")
 		xText.insert(INSERT, "Appendlength: "+str(appendlength))
@@ -361,7 +378,7 @@ def resetfig():
 		disabledindex = []
 		numchannels = maxchannels
 		curchannels = [elem for elem in range(maxchannels)]
-		print(curchannels, disabledaxes, disabledindex, numchannels)
+		#print(curchannels, disabledaxes, disabledindex, numchannels)
 		init_fig()
 		old_fig_size = old_fig_size - [1,1]
 		toggleFaucet(True)
@@ -385,7 +402,7 @@ increase_x_button = Button(master = xFrame, command = lambda:updatewidth("add"),
 increase_x_button.pack()
 window.bind('<Right>', lambda event:updatewidth("add"))
 xText = Text(master = xFrame, height = 1)
-xText.insert(INSERT, "Width: "+("%.0f"%(totallength*decimationfactor))+" samples (undecimated)")
+xText.insert(INSERT, "Width: "+("%.0f"%(totallength*decimationfactor))+" samples (undecimated), decimation of "+str(decimationfactor))
 xText.pack()
 decrease_x_button = Button(master = xFrame, command = lambda:updatewidth("remove"), height=2, width=20, text="zoom in width")
 decrease_x_button.pack()
@@ -469,11 +486,11 @@ elif humanFlag  is False:
 
 mb = Menubutton(masterFrame, text="FFT Channels", relief=RAISED)
 #mb.grid()
-mb.menu = Menu(mb)
+mb.menu = Menu(mb, tearoff=1)
 checkbuttonvars = []
 prevselected = []
 def printSelectedOptions():
-	global checkbuttonvars, prevselected, fftToggleVar
+	global checkbuttonvars, prevselected, fftToggleVar, mb
 	selectedOptions = [count for (count, var) in enumerate(checkbuttonvars) if var.get()]
 	latestOption = np.setdiff1d(selectedOptions, prevselected)
 	print(latestOption)
@@ -484,10 +501,13 @@ def printSelectedOptions():
 	print(prevselected)
 	if(fftToggleVar.get() == 1):
 		init_fft()
+	#print(mb.winfo_rooty(), mb.winfo_reqheight())
+	#mb.menu.post(mb.winfo_rootx(), mb.winfo_rooty()+mb.winfo_reqheight())
+	mb.event_generate('<<Invoke>>')
 mb['menu'] = mb.menu
 for i in range(maxchannels):
 	if limitchannels != None:
-		if i+1 not in limitchannels:
+		if i not in limitchannels:
 			continue
 	var = BooleanVar()
 	checkbuttonvars.append(var)
@@ -621,8 +641,9 @@ elif humanFlag  is False:
 	asyncio.run(readinbinary())
 window.mainloop()
 
+#added features, grid, log scaling on y in fft, menu stays open, adaptive decimation
+#
 
-#TODO: Logscale x axis on FFT
 
 #USE sys.stdin.buffer.read() instead of os.read!!!
 #change changex and changey behaviour for fftmode, such that y goes from 0 to y, and x changes
